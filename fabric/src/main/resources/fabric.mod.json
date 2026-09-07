@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "mod_access_control",
+  "version": "${version}",
+  "name": "Mod Access Control",
+  "description": "客户端模组准入控制（模组准入控制）：通过统一的两阶段握手在 Forge / Fabric / NeoForge 服务端校验客户端的协议、加载器、必需 Mod 与白名单/黑名单策略。",
+  "authors": [
+    "MCYSZL"
+  ],
+  "contact": {
+    "sources": "https://github.com/mcyszl/mod-access-control"
+  },
+  "license": "GNU GPL 3.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "mcyszl.top.mod_access_control.fabric.FabricMacMod"
+    ],
+    "client": [
+      "mcyszl.top.mod_access_control.fabric.FabricClientMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

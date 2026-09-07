@@ -1,0 +1,25 @@
+{
+  "configVersion": 1,
+  "enabled": true,
+  "enforceIntegratedServer": false,
+  "requireClientMod": true,
+  "strictLoader": true,
+  "handshakeTimeoutSeconds": 10,
+  "requiredCheckMode": "version_range",
+  "requiredMods": [
+    { "id": "example_library", "minVersion": "1.0.0" },
+    { "id": "example_map", "exactVersion": "3.2.1" }
+  ],
+  "policy": {
+    "mode": "blacklist",
+    "activeMode": "whitelist",
+    "recheckIntervalSeconds": 60,
+    "whitelist": [],
+    "blacklist": [
+      "example_cheat_mod",
+      "example_xray_mod"
+    ]
+  },
+  "ignoredModIds": [],
+  "logViolations": true
+}

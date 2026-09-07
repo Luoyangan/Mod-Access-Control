@@ -1,0 +1,92 @@
+package mcyszl.top.mod_access_control.forge;
+
+import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.feedback.DisconnectReason;
+import mcyszl.top.mod_access_control.core.feedback.KickMessage;
+import mcyszl.top.mod_access_control.forge.command.MacCommand;
+import mcyszl.top.mod_access_control.forge.net.ForgeNet;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
+
+/**
+ * Forge 事件接线：服务器生命周期 / 玩家加入离开 / 刻驱动 / 命令注册 / 管理员通知。
+ */
+public final class ForgeEvents {
+
+    private ForgeEvents() {
+    }
+
+    public static void onServerStarted(ServerStartedEvent e) {
+        Holder.service().onServerStarted();
+    }
+
+    public static void onServerStopping(ServerStoppingEvent e) {
+        Holder.service().onServerStopping();
+    }
+
+    public static void onServerTick(TickEvent.ServerTickEvent.Post e) {
+        Holder.service().onServerTick();
+    }
+
+    /** 玩家进入世界（PLAY 相位开始）：做加入预拦截，随后开启两阶段握手。 */
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer sp)) {
+            return;
+        }
+        String uuid = sp.getStringUUID();
+        String name = sp.getGameProfile().getName();
+        if (Holder.service().shouldEnforce() && Holder.service().requireClientMod()
+                && !ForgeNet.remoteHasChannel(sp.connection.getConnection())) {
+            // 客户端没装本模组：立即以明确原因拒绝，不等超时。
+            Holder.service().rejectImmediate(uuid, name,
+                    KickMessage.simple(DisconnectReason.NO_CLIENT_MOD));
+            return;
+        }
+        Holder.service().onPlayerJoin(uuid, name);
+    }
+
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer sp)) {
+            return;
+        }
+        Holder.service().onPlayerLeave(sp.getStringUUID());
+    }
+
+    public static void onRegisterCommands(RegisterCommandsEvent e) {
+        MacCommand.register(e.getDispatcher());
+    }
+
+    /** 向在线管理员广播纯文本（聊天），并以 ActionBar + 音效提示。 */
+    public static void alertOps(String text) {
+        MinecraftServer server = MacForgeBridge.server();
+        if (server == null) {
+            Mac.logger().warn("(无服务器上下文) 管理员通知: {}", text);
+            return;
+        }
+        Component line = Component.literal("[MAC] " + text)
+                .withStyle(ChatFormatting.YELLOW);
+        Component bar = Component.literal("\u26A0 " + text) // 警示符号
+                .withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+        boolean any = false;
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (server.getPlayerList().isOp(p.getGameProfile())) {
+                p.sendSystemMessage(line);
+                p.displayClientMessage(bar, true);
+                p.playNotifySound(SoundEvents.ANVIL_LAND, SoundSource.MASTER, 0.5f, 1.0f);
+                any = true;
+            }
+        }
+        if (!any) {
+            Mac.logger().warn("(无在线管理员) 管理员通知: {}", text);
+        }
+    }
+}
