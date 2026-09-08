@@ -44,6 +44,33 @@ public class MacConfig {
     /** 是否把违规事件写入服务端日志。 */
     private boolean logViolations = true;
 
+    /**
+     * 豁免名单：条目为玩家名（忽略大小写）或以 {@code uuid:} 开头的 UUID。
+     * 被豁免的玩家不做握手、不发任何网络消息、不参与任何校验。
+     */
+    private List<String> exemptPlayers = new ArrayList<>();
+
+    /** 是否默认豁免服务端 OP（不参与任何校验）。 */
+    private boolean exemptOps = false;
+
+    /**
+     * 试运行模式：违规（含未安装本模组 / 规则不通过）只记日志、记 recent 并
+     * 通知管理员，不实际踢出玩家。用于上线前验证规则是否误伤。
+     */
+    private boolean dryRun = false;
+
+    /** 踢出消息底部“提示区”是否显示（原因明细行不受此开关影响）。默认开启。 */
+    private boolean kickFooterEnabled = true;
+
+    /** 踢出消息底部提示区之后追加的自定义行（逐行展示），可为空。 */
+    private List<String> kickFooterLines = new ArrayList<>();
+
+    /**
+     * 允许接入的本模组（Mod Access Control）版本白名单，精确匹配客户端上报的 macVersion。
+     * 空列表 = 放行任意版本（默认）。条目为大小写不敏感的版本字符串。
+     */
+    private List<String> allowedMacVersions = new ArrayList<>();
+
     public int getConfigVersion() {
         return configVersion;
     }
@@ -136,6 +163,85 @@ public class MacConfig {
         this.logViolations = logViolations;
     }
 
+    public List<String> getExemptPlayers() {
+        return exemptPlayers;
+    }
+
+    public void setExemptPlayers(List<String> exemptPlayers) {
+        this.exemptPlayers = exemptPlayers == null ? new ArrayList<>() : exemptPlayers;
+    }
+
+    public boolean isExemptOps() {
+        return exemptOps;
+    }
+
+    public void setExemptOps(boolean exemptOps) {
+        this.exemptOps = exemptOps;
+    }
+
+    public boolean isDryRun() {
+        return dryRun;
+    }
+
+    public void setDryRun(boolean dryRun) {
+        this.dryRun = dryRun;
+    }
+
+    public boolean isKickFooterEnabled() {
+        return kickFooterEnabled;
+    }
+
+    public void setKickFooterEnabled(boolean kickFooterEnabled) {
+        this.kickFooterEnabled = kickFooterEnabled;
+    }
+
+    public List<String> getKickFooterLines() {
+        return kickFooterLines;
+    }
+
+    public void setKickFooterLines(List<String> kickFooterLines) {
+        this.kickFooterLines = kickFooterLines == null ? new ArrayList<>() : kickFooterLines;
+    }
+
+    public List<String> getAllowedMacVersions() {
+        return allowedMacVersions;
+    }
+
+    public void setAllowedMacVersions(List<String> allowedMacVersions) {
+        this.allowedMacVersions = allowedMacVersions == null ? new ArrayList<>() : allowedMacVersions;
+    }
+
+    /**
+     * 把反序列化后可能缺失的字段补齐默认值，保证旧版配置文件（缺少 v1.1 新增字段）
+     * 加载后所有集合非空、枚举字段为合法键。
+     */
+    public void normalize() {
+        if (requiredMods == null) {
+            requiredMods = new ArrayList<>();
+        }
+        if (ignoredModIds == null) {
+            ignoredModIds = new ArrayList<>();
+        }
+        if (exemptPlayers == null) {
+            exemptPlayers = new ArrayList<>();
+        }
+        if (kickFooterLines == null) {
+            kickFooterLines = new ArrayList<>();
+        }
+        if (allowedMacVersions == null) {
+            allowedMacVersions = new ArrayList<>();
+        }
+        if (policy == null) {
+            policy = new PolicyConfig();
+        }
+        policy.normalize();
+        for (RequiredModRule r : requiredMods) {
+            if (r != null) {
+                r.normalize();
+            }
+        }
+    }
+
     /**
      * 策略配置（白名单 / 黑名单 / 双模式+复检）。
      */
@@ -209,6 +315,18 @@ public class MacConfig {
 
         public void setBlacklist(List<String> blacklist) {
             this.blacklist = blacklist == null ? new ArrayList<>() : blacklist;
+        }
+
+        /** 补齐默认值（旧配置文件可能缺字段）。 */
+        public void normalize() {
+            if (whitelist == null) {
+                whitelist = new ArrayList<>();
+            }
+            if (blacklist == null) {
+                blacklist = new ArrayList<>();
+            }
+            mode = PolicyMode.byKey(mode).key();
+            activeMode = PolicyMode.byKey(activeMode).key();
         }
     }
 

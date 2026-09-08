@@ -1,8 +1,6 @@
 package mcyszl.top.mod_access_control.neoforge;
 
 import mcyszl.top.mod_access_control.core.Mac;
-import mcyszl.top.mod_access_control.core.feedback.DisconnectReason;
-import mcyszl.top.mod_access_control.core.feedback.KickMessage;
 import mcyszl.top.mod_access_control.neoforge.command.MacCommand;
 import mcyszl.top.mod_access_control.neoforge.net.NeoNet;
 import net.minecraft.ChatFormatting;
@@ -37,21 +35,16 @@ public final class NeoEvents {
         Holder.service().onServerTick();
     }
 
-    /** 玩家进入世界（PLAY 相位开始）：做加入预拦截，随后开启两阶段握手。 */
+    /** 玩家进入世界（PLAY 相位开始）：统一交给核心做预检（开关/豁免/未装模组/试运行）后开启握手。 */
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer sp)) {
             return;
         }
         String uuid = sp.getStringUUID();
         String name = sp.getGameProfile().getName();
-        if (Holder.service().shouldEnforce() && Holder.service().requireClientMod()
-                && !NeoNet.remoteHasChannel(sp)) {
-            // 客户端没装本模组：立即以明确原因拒绝，不等超时。
-            Holder.service().rejectImmediate(uuid, name,
-                    KickMessage.simple(DisconnectReason.NO_CLIENT_MOD));
-            return;
-        }
-        Holder.service().onPlayerJoin(uuid, name);
+        boolean hasChannel = NeoNet.remoteHasChannel(sp);
+        boolean isOp = sp.server != null && sp.server.getPlayerList().isOp(sp.getGameProfile());
+        Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
     }
 
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e) {

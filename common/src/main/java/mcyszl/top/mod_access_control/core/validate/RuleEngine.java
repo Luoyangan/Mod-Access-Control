@@ -108,22 +108,39 @@ public final class RuleEngine {
 
     private static boolean versionAllowed(RequiredModRule rule, String actualVersion) {
         SemVer actual = SemVer.parse(actualVersion);
-        if (rule.getExactVersion() != null) {
-            SemVer want = SemVer.parse(rule.getExactVersion());
-            return want == null || (actual != null && actual.compareTo(want) == 0);
+        List<RequiredModRule.Bound> bounds = rule.effectiveBounds();
+        if (bounds.isEmpty()) {
+            // 无版本约束：存在即可（缺失已在调用方处理）。
+            return true;
         }
-        if (rule.getMinVersion() != null) {
-            SemVer min = SemVer.parse(rule.getMinVersion());
-            if (min != null && (actual == null || actual.compareTo(min) < 0)) {
-                return false;
-            }
-        }
-        if (rule.getMaxVersion() != null) {
-            SemVer max = SemVer.parse(rule.getMaxVersion());
-            if (max != null && (actual == null || actual.compareTo(max) > 0)) {
+        for (RequiredModRule.Bound b : bounds) {
+            if (!matchBound(b, actual)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /** 用一条操作符约束比对客户端实际版本。 */
+    private static boolean matchBound(RequiredModRule.Bound bound, SemVer actual) {
+        SemVer want = SemVer.parse(bound.getVersion());
+        if (want == null) {
+            // 规则里配置的版本无法解析：当作无约束，避免误伤。
+            return true;
+        }
+        if (actual == null) {
+            // 客户端版本无法解析：仅 “!=” 可视为“确非该版本”成立。
+            return "!=".equals(bound.getOp());
+        }
+        int c = actual.compareTo(want);
+        return switch (bound.getOp()) {
+            case "=" -> c == 0;
+            case "!=" -> c != 0;
+            case ">" -> c > 0;
+            case ">=" -> c >= 0;
+            case "<" -> c < 0;
+            case "<=" -> c <= 0;
+            default -> true;
+        };
     }
 }

@@ -14,7 +14,9 @@ public enum DisconnectReason {
     /** 校验阶段超时。 */
     HANDSHAKE_TIMEOUT(Keys.KICK_HEADER_TIMEOUT),
     /** 规则校验未通过（缺失必需 Mod / 版本不符 / 黑白名单等）。 */
-    POLICY_VIOLATION(Keys.KICK_HEADER_VIOLATION);
+    POLICY_VIOLATION(Keys.KICK_HEADER_VIOLATION),
+    /** 本模组版本不在服务器允许的接入版本列表中。 */
+    MAC_VERSION_NOT_ALLOWED(Keys.KICK_HEADER_MAC_VERSION);
 
     private final String headerKey;
 

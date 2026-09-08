@@ -7,8 +7,8 @@
   "handshakeTimeoutSeconds": 10,
   "requiredCheckMode": "version_range",
   "requiredMods": [
-    { "id": "example_library", "minVersion": "1.0.0" },
-    { "id": "example_map", "exactVersion": "3.2.1" }
+    { "id": "example_library", "bounds": [ { "op": ">=", "version": "1.0.0" } ] },
+    { "id": "example_map", "bounds": [ { "op": "=", "version": "3.2.1" } ] }
   ],
   "policy": {
     "mode": "blacklist",
@@ -21,5 +21,11 @@
     ]
   },
   "ignoredModIds": [],
-  "logViolations": true
+  "logViolations": true,
+  "exemptPlayers": [],
+  "exemptOps": false,
+  "dryRun": false,
+  "allowedMacVersions": [],
+  "kickFooterEnabled": true,
+  "kickFooterLines": []
 }

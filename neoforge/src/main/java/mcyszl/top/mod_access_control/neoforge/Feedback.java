@@ -31,7 +31,12 @@ public final class Feedback {
                 c.append(Component.literal("\n  - " + problemOf(p)).withStyle(ChatFormatting.YELLOW));
             }
         }
-        c.append(Component.literal("\n" + hintOf(m.reason())).withStyle(ChatFormatting.GRAY));
+        List<String> footer = m.footer();
+        if (footer != null) {
+            for (String line : footer) {
+                c.append(Component.literal("\n" + line).withStyle(ChatFormatting.GRAY));
+            }
+        }
         return c;
     }
 
@@ -50,15 +55,9 @@ public final class Feedback {
                     "准入校验超时。若你已安装本模组，请重启游戏后重试；"
                             + "若仍未解决，请联系服务器管理员。";
             case POLICY_VIOLATION -> "准入校验未通过，客户端 Mod 列表存在以下问题：";
-        };
-    }
-
-    private static String hintOf(DisconnectReason r) {
-        return switch (r) {
-            case NO_CLIENT_MOD, PROTOCOL_MISMATCH, LOADER_MISMATCH ->
-                    "提示：请按服务器要求安装正确的模组版本后重新加入。";
-            case HANDSHAKE_TIMEOUT -> "提示：如多次失败，请尝试更新游戏/模组版本后重连。";
-            case POLICY_VIOLATION -> "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。";
+            case MAC_VERSION_NOT_ALLOWED ->
+                    "连接被拒绝：本模组版本不在服务器允许列表内。\n"
+                            + "服务器要求的版本: " + arg(args, 0) + "；你的版本: " + arg(args, 1) + "。";
         };
     }
 

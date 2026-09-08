@@ -20,8 +20,11 @@
 | 两阶段握手 | 登录阶段（最小传输：协议/加载器/必需 Mod）+ 进入游戏阶段（完整 Mod 列表复核） |
 | 必需 Mod 校验 | `presence` 存在性 / `version_range` 版本范围 / `strict` 严格匹配 |
 | 策略系统 | `whitelist` / `blacklist` / `switch`（双模式 + 按间隔定期复检） |
-| 规则管理 | 启动读配置 + 游戏内 `/mac` 命令即时修改 / 查看 / 保存 |
-| 玩家反馈 | 纯文本断开原因（缺失 / 版本不符 / 违规 Mod 明细）+ 提示语 |
+| 规则管理 | 启动读配置 + 游戏内 `/mac` 命令即时修改 / 查看 / 保存（枚举参数带自动补全） |
+| 玩家反馈 | 纯文本断开原因（缺失 / 版本不符 / 违规 Mod 明细）+ 底部提示区（可用自定义行） |
+| 豁免 | `exemptPlayers` 玩家名 / `uuid:` 列表 + `exemptOps`，豁免者跳过全部校验与握手 |
+| 试运行 | `dryRun`：违规只记录 / 通知，不实际踢出，用于上线前验证规则避免误伤 |
+| Mod 历史 | 玩家客户端 Mod 清单持久记录（JSONL），支持 `/mac audit` 审计、`/mac learn` 一键建名单 |
 | 管理辅助 | 在线管理员收到违规广播（聊天 + ActionBar + 音效），`/mac status`、`/mac recent` |
 | 错误处理 | 解析失败自动备份（`*.invalid.bak`）并重置默认；全流程 try/catch + 日志 |
 
@@ -45,9 +48,8 @@ neoforge/   # NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
 仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换）、
 服务器事件接线、配置文件路径与日志桥。
 
-> 说明：Forge 产物经真实 `gradle build` 验证；Fabric 与 NeoForge 采用同源复制模式提供，
-> 通过 javap 对照官方 API 编写，尚未在本机做端到端编译验证（构建脚本与版本均已锁定向官方
-> maven 元数据）。
+> 说明：Forge、Fabric、NeoForge 三端产物均经本机真实 `gradle build` 编译验证通过
+> （JDK 21；构建期间对 NeoForge maven 使用 IPv6 路由：`JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`）。
 
 ---
 
@@ -60,11 +62,11 @@ neoforge/   # NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
 cd forge
 .\gradlew.bat build        # 产物：forge/build/libs/mod_access_control-1.0.0.jar
 
-# Fabric
+# Fabric（已实测通过）
 cd ..\fabric
 .\gradlew.bat build
 
-# NeoForge
+# NeoForge（已实测通过）
 cd ..\neoforge
 .\gradlew.bat build
 ```
@@ -98,7 +100,7 @@ cd ..\neoforge
 | `strictLoader` | `true` | 客户端加载器标识必须与服务端一致 |
 | `handshakeTimeoutSeconds` | `10` | 每个握手阶段的超时秒数 |
 | `requiredCheckMode` | `"presence"` | 必需 Mod 校验模式：`presence` / `version_range` / `strict` |
-| `requiredMods[]` | `[]` | 必需 Mod 清单（`id` + 可选 `minVersion`/`maxVersion`/`exactVersion`） |
+| `requiredMods[]` | `[]` | 必需 Mod 清单（`id` + 可选 `bounds[]` 操作符约束，或旧版 `minVersion`/`maxVersion`/`exactVersion`） |
 | `policy.mode` | `"blacklist"` | 策略：`whitelist` / `blacklist` / `switch` |
 | `policy.activeMode` | `"whitelist"` | `switch` 模式下当前生效的策略 |
 | `policy.recheckIntervalSeconds` | `60` | 定期复检间隔（秒），`0` = 不复检 |
@@ -106,17 +108,28 @@ cd ..\neoforge
 | `policy.blacklist[]` | `[]` | 黑名单（mod id） |
 | `ignoredModIds[]` | `[]` | 额外忽略的 mod id（不参与任何校验） |
 | `logViolations` | `true` | 违规事件是否写入服务端日志 |
+| `exemptPlayers[]` | `[]` | 豁免玩家：玩家名（忽略大小写）或 `uuid:` 前缀的 UUID |
+| `exemptOps` | `false` | 是否默认豁免服务端 OP（不参与任何校验） |
+| `dryRun` | `false` | 试运行：违规只记录 / 通知，不实际踢出（验证规则用） |
+| `allowedMacVersions[]` | `[]` | 允许接入的本模组（Mod Access Control）版本列表，精确匹配客户端 macVersion；空 = 放行任意版本 |
+| `kickFooterEnabled` | `true` | 踢出消息底部“提示区”是否显示 |
+| `kickFooterLines[]` | `[]` | 底部提示区之后追加的自定义行 |
 
 **必需 Mod 约束写法**（`version_range` 模式生效；`strict` 模式下上述规则 + 加载器一致性都须满足）：
 
 ```json
 "requiredMods": [
-  { "id": "sodium" },                                   // 任意版本，仅需存在
-  { "id": "fabric-api", "minVersion": "0.100.0" },      // 下限
-  { "id": "some_mod",   "maxVersion": "2.0.0" },        // 上限
-  { "id": "map_mod",    "exactVersion": "1.2.3" }       // 精确版本（优先级最高）
+  { "id": "sodium" },                                                  // 任意版本，仅需存在
+  { "id": "fabric-api", "bounds": [ { "op": ">=", "version": "0.100.0" } ] }, // 下限
+  { "id": "some_mod",   "bounds": [ { "op": "<", "version": "2.0.0" } ] },    // 上限
+  { "id": "map_mod",    "bounds": [ { "op": "=", "version": "1.2.3" } ] }     // 精确版本
 ]
 ```
+
+操作符支持：`=`（等于）、`!=`（不等于）、`>` / `>=`、`<` / `<=`；多条 `bounds` 之间为
+“且”关系。旧版字段 `minVersion` / `maxVersion` / `exactVersion` 仍受支持并自动按
+`[min,max]` / `exact` 语义参与校验（`required add` 已改用手写操作符 `>=1.0.0`、
+`1.0.0~2.0.0`、`--min 1.0.0` 等语法写入 `bounds`）。
 
 完整示例见 [config-example/mod_access_control.json](config-example/mod_access_control.json)。
 
@@ -140,20 +153,28 @@ cd ..\neoforge
 
 | 命令 | 作用 |
 | --- | --- |
-| `/mac` 或 `/mac status` | 查看当前策略、清单数量、在线会话统计 |
+| `/mac` 或 `/mac status` | 查看当前策略、清单数量、豁免 / 试运行状态、在线会话统计 |
 | `/mac recent` | 最近违规记录（最新在前，最多 20 条展示） |
-| `/mac check <玩家>` | 查看指定玩家会话状态 |
+| `/mac check <玩家>` | 查看指定玩家会话状态（玩家参数可 Tab 补全） |
+| `/mac audit <玩家>` | 查看指定玩家最近的历史 Mod 记录（最多 10 条，来自 JSONL 持久记录） |
+| `/mac learn <玩家> <whitelist/blacklist>` | 用该玩家在线/最近一次 Mod 清单一键写入白名单或黑名单 |
 | `/mac reload` | 从配置文件重新加载规则 |
 | `/mac save` | 把当前内存配置保存到文件 |
 | `/mac recheck` | 用最新规则对在线玩家立即复检一次 |
 | `/mac enabled <true/false>` | 总开关 |
-| `/mac mode <whitelist/blacklist/switch>` | 设置策略模式 |
-| `/mac active <whitelist/blacklist>` | 设置 switch 模式下生效的策略 |
+| `/mac dryrun <true/false>` | 试运行开关（违规不实际踢出） |
+| `/mac mode <whitelist/blacklist/switch>` | 设置策略模式（Tab 可补全） |
+| `/mac active <whitelist/blacklist>` | 设置 switch 模式下生效的策略（Tab 可补全） |
+| `/mac exempt list\|add <玩家>\|remove <玩家>` | 管理豁免名单（移除项 Tab 可补全） |
+| `/mac allowedmac list\|add <版本>\|remove <版本>` | 管理允许接入的本模组版本（空 = 放行任意；`add *` 清空限制） |
 | `/mac required list` | 列出必需 Mod |
-| `/mac required add <id> [--min x] [--max y] [--exact z]` | 新增必需 Mod（可附裸参 `1.0~2.0` / `=1.2.3`） |
-| `/mac required remove <id>` | 移除必需 Mod |
-| `/mac whitelist list\|add <id>\|remove <id>` | 管理白名单 |
-| `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单 |
+| `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
+| `/mac required remove <id>` | 移除必需 Mod（Tab 可补全） |
+| `/mac whitelist list\|add <id>\|remove <id>` | 管理白名单（移除项 Tab 可补全） |
+| `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单（移除项 Tab 可补全） |
+
+> 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
+> `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
 
 所有修改会即时写盘并影响下一名玩家 / 下一次复检。
 
@@ -163,20 +184,22 @@ cd ..\neoforge
 
 ```
 玩家加入
-  ├─ 预拦截：requireClientMod 且服务端启用时，若对方未注册本模组通道 → 立即踢出(NO_CLIENT_MOD)
-  └─ 建立会话，发送 stage1_req（仅含：协议版本、必需Mod校验模式、必需Mod id 列表）
+  ├─ 统一预检(handleLoginAttempt)：总开关关闭 → 直接放行
+  │    ├─ 命中豁免（exemptPlayers / exemptOps）→ 直接放行，不发任何包、不建会话
+  │    ├─ 未装本模组 且 requireClientMod=true → 立即踢出(NO_CLIENT_MOD)；dryRun 下只记录
+  │    └─ 通过 → 建立会话，发送 stage1_req（仅含：协议版本、必需Mod校验模式、必需Mod id 列表）
        │
        ▼  客户端应答 stage1_resp（最小数据：协议、加载器标识/版本、本模组版本、必需Mod的版本映射）
     服务端登录阶段校验：协议版本 → 加载器兼容(严格) → 必需Mod(presence/version_range/strict)
        │
-       ├─ 失败 → 踢出并记录（缺失/版本不符等明细展示给玩家）
+       ├─ 失败 → 记录违规；dryRun 下置 VERIFIED 不踢出，否则踢出并记录（明细展示给玩家）
        └─ 通过 → 发送 stage2_req
                     │
                     ▼  客户端应答 stage2_resp（完整 Mod id+版本 列表）
                  服务端进入游戏阶段校验：必需Mod复核 + 白名单/黑名单 + 加载器(严格)
                     │
-                    ├─ 失败 → 踢出
-                    └─ 通过 → 状态 VERIFIED，允许进入世界；之后按间隔定期复检
+                    ├─ 失败 → 同上（dryRun 记录 / 正常踢出）
+                    └─ 通过 → 状态 VERIFIED、写入 Mod 历史记录，允许进入世界；之后按间隔定期复检
 ```
 
 - **登录阶段**只交换“必要信息”，避免传输全量列表；
@@ -190,7 +213,14 @@ cd ..\neoforge
 ## 九、玩家反馈与管理端提示
 
 - **被拒玩家**：断开原因组件由服务端直接构造纯文本（无翻译键依赖），逐条列出
-  “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”，附解决提示。
+  “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”；下方附加底部提示区（默认提示 +
+  配置的自定义行，`kickFooterEnabled` 可整体关闭）。
+- **豁免者**：不发送任何网络消息、不建立会话、不参与校验，直接放行。
+- **试运行（dryRun）**：所有本应踢出的违规划转为“记录违规 + 通知管理员（标注未实际踢出）”，
+  用于上线前验证规则是否误伤。
+- **Mod 历史**：每个通过/被拒玩家在握手结束时把完整 Mod 清单写入
+  `config/mod_access_control_history.jsonl`（最长保留 2 万条 / 8MB），可用 `/mac audit` 审计，
+  或 `/mac learn` 一键把它写入白名单 / 黑名单。
 - **管理员**：每次拦截通过聊天 + ActionBar + 铁砧音效广播（`[MAC] 违规拦截: 玩家 -> 原因`），
   无在线管理员时降级为服务端日志；历史记录可用 `/mac recent` 查看。
 
@@ -201,9 +231,15 @@ cd ..\neoforge
 - 日志统一前缀 `[MAC]`，包含握手进度、放行 / 拒绝、配置加载与保存结果；
 - 配置文件损坏时自动备份为 `mod_access_control.json.invalid.bak` 并重建默认；
 - 全部网络与规则执行均包裹 try/catch，单个 mod 读取失败不影响整体判断；
-- 违规记录为内存环形缓冲（上限 200 条），服务器重启清空。
+- 违规记录为内存环形缓冲（上限 200 条），服务器重启清空；
+- 玩家 Mod 历史为持久 JSONL 记录（`mod_access_control_history.jsonl`），重启不丢失，
+  自动裁剪（最多 2 万条 / 8MB），供 `/mac audit` 与 `/mac learn` 使用。
 
 ## 十一、License / 免责
 
 本项目以 GNU GPL 3.0 发布；准入控制校验的是 mod 标识与版本组合，供服务器管理者表达
 **“允许/禁止安装哪些 Mod”** 的规则，不构成对文件级改动的防作弊保证。
+
+## 十二、版权
+
+@Copyright 2024-2026 原生之旅 | mcyszl.top Luoyangan

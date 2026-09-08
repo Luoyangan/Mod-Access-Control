@@ -9,7 +9,8 @@ group = mod_group_id
 version = mod_version
 
 base {
-    archivesName = mod_id
+    // 输出名：模组名称-模组加载器-mc版本-模组版本
+    archivesName = "${archives_base_name}-forge-${minecraft_version}"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)

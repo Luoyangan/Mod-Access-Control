@@ -1,8 +1,6 @@
 package mcyszl.top.mod_access_control.fabric;
 
 import mcyszl.top.mod_access_control.core.Mac;
-import mcyszl.top.mod_access_control.core.feedback.DisconnectReason;
-import mcyszl.top.mod_access_control.core.feedback.KickMessage;
 import mcyszl.top.mod_access_control.fabric.command.MacCommand;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -43,14 +41,9 @@ public final class FabricEvents {
             }
             String uuid = sp.getStringUUID();
             String name = sp.getGameProfile().getName();
-            if (Holder.service().shouldEnforce() && Holder.service().requireClientMod()
-                    && !ServerPlayNetworking.canSend(sp, FabricNet.Stage1RequestPayload.TYPE)) {
-                // 客户端没装本模组：立即以明确原因拒绝，不等超时。
-                Holder.service().rejectImmediate(uuid, name,
-                        KickMessage.simple(DisconnectReason.NO_CLIENT_MOD));
-                return;
-            }
-            Holder.service().onPlayerJoin(uuid, name);
+            boolean hasChannel = ServerPlayNetworking.canSend(sp, FabricNet.Stage1RequestPayload.TYPE);
+            boolean isOp = server.getPlayerList().isOp(sp.getGameProfile());
+            Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayer sp = handler.getPlayer();

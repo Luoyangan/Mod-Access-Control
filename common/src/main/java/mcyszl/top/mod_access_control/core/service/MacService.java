@@ -3,6 +3,7 @@ package mcyszl.top.mod_access_control.core.service;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.config.ConfigManager;
 import mcyszl.top.mod_access_control.core.feedback.DisconnectReason;
+import mcyszl.top.mod_access_control.core.feedback.FeedbackText;
 import mcyszl.top.mod_access_control.core.feedback.KickMessage;
 import mcyszl.top.mod_access_control.core.model.CheckMode;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
@@ -19,11 +20,15 @@ import mcyszl.top.mod_access_control.core.platform.PlatformBridge;
 import mcyszl.top.mod_access_control.core.session.Session;
 import mcyszl.top.mod_access_control.core.session.Session.Phase;
 import mcyszl.top.mod_access_control.core.session.ViolationRecord;
+import mcyszl.top.mod_access_control.core.storage.ModHistoryStore;
+import mcyszl.top.mod_access_control.core.storage.ModRecord;
 import mcyszl.top.mod_access_control.core.validate.Problem;
 import mcyszl.top.mod_access_control.core.validate.RuleEngine;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -51,11 +56,15 @@ public final class MacService {
     private final ConfigManager configManager;
     private final Map<String, Session> sessions = new HashMap<>();
     private final Deque<ViolationRecord> violations = new ArrayDeque<>();
+    private final ModHistoryStore history;
     private long tick;
 
     public MacService(PlatformBridge bridge) {
         this.bridge = bridge;
         this.configManager = new ConfigManager(bridge.configFile());
+        // 玩家 Mod 清单历史记录与配置文件同目录（*.jsonl），纯文件追加式存储。
+        this.history = new ModHistoryStore(
+                bridge.configFile().resolveSibling("mod_access_control_history.jsonl"));
     }
 
     // ------------------------------------------------------------------ 生命周期
@@ -102,6 +111,66 @@ public final class MacService {
         sessions.put(uuid, s);
         armDeadline(s);
         sendStage1Request(s);
+    }
+
+    /**
+     * 适配层 JOIN 事件统一入口：把“预拦截”判断（总开关 / 豁免 / 未装本模组 / 试运行）
+     * 收敛到核心，避免三种加载器重复实现且语义不一致。
+     *
+     * @param hasChannel 客户端是否注册了本模组的网络通道（未装本模组为 false）
+     * @param isOp       该玩家是否为服务端 OP（用于 {@code exemptOps}）
+     */
+    public void handleLoginAttempt(String uuid, String playerName, boolean hasChannel, boolean isOp) {
+        MacConfig cfg = configManager.current();
+        if (!shouldEnforce()) {
+            return;
+        }
+        if (isExempt(uuid, playerName, isOp)) {
+            Mac.logger().info("[MAC] 玩家 {} 命中豁免名单，跳过准入校验", playerName);
+            return;
+        }
+        if (!cfg.isRequireClientMod()) {
+            Mac.logger().info("[MAC] 客户端准入未强制开启(requireClientMod=false)，放行玩家 {}", playerName);
+            return;
+        }
+        if (!hasChannel) {
+            if (cfg.isDryRun()) {
+                logViolationOnly(uuid, playerName, "试运行(NO_CLIENT_MOD 未拦截): 客户端未安装本模组");
+                bridge.notifyOps("试运行: " + playerName + " 客户端未安装本模组（本将拦截，未实际踢出）");
+                return;
+            }
+            rejectImmediate(uuid, playerName,
+                    KickMessage.simple(DisconnectReason.NO_CLIENT_MOD));
+            return;
+        }
+        onPlayerJoin(uuid, playerName);
+    }
+
+    /** 该玩家是否命中豁免（exemptOps 或豁免名单条目）。 */
+    public boolean isExempt(String uuid, String playerName, boolean isOp) {
+        MacConfig cfg = configManager.current();
+        if (cfg.isExemptOps() && isOp) {
+            return true;
+        }
+        if (cfg.getExemptPlayers() != null) {
+            for (String entry : cfg.getExemptPlayers()) {
+                if (entry == null) {
+                    continue;
+                }
+                String e = entry.trim();
+                if (e.isEmpty()) {
+                    continue;
+                }
+                if (e.regionMatches(true, 0, "uuid:", 0, 5)) {
+                    if (uuid != null && e.substring(5).equalsIgnoreCase(uuid)) {
+                        return true;
+                    }
+                } else if (e.equalsIgnoreCase(playerName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** 玩家离开。 */
@@ -166,6 +235,15 @@ public final class MacService {
                     String.valueOf(Mac.PROTOCOL_VERSION), String.valueOf(resp.protocol)));
             return;
         }
+        // 服务器限制本模组版本：仅在客户端上报的 macVersion 命中允许列表时才放行。
+        List<String> allowedMac = cfg.getAllowedMacVersions();
+        if (allowedMac != null && !allowedMac.isEmpty()
+                && allowedMac.stream().noneMatch(v -> v.equalsIgnoreCase(s.macVersion()))) {
+            deny(s, KickMessage.simple(DisconnectReason.MAC_VERSION_NOT_ALLOWED,
+                    String.join(", ", allowedMac),
+                    s.macVersion() == null || s.macVersion().isEmpty() ? "未知" : s.macVersion()));
+            return;
+        }
         boolean strict = cfg.requiredMode() == CheckMode.STRICT || cfg.isStrictLoader();
         problems.addAll(RuleEngine.checkLoader(strict, bridge.loaderType(), resp.loaderType));
         problems.addAll(RuleEngine.checkRequired(cfg.getRequiredMods(), resp.modVersions, cfg.requiredMode()));
@@ -198,6 +276,7 @@ public final class MacService {
         s.phase(Phase.VERIFIED);
         s.deadlineTick(0);
         s.lastRecheckTick(tick);
+        recordHistory(s, ModRecord.RESULT_VERIFIED);
         Mac.logger().info("[MAC] 玩家 {} 通过全部准入校验，允许进入游戏（加载 {} 个客户端 Mod）",
                 s.name(), s.fullList().size());
     }
@@ -255,15 +334,22 @@ public final class MacService {
 
     /**
      * 供适配层在“握手尚未建立会话”前做预拦截时调用（如客户端未安装本模组）：
-     * 记录违规、通知管理员并断开玩家，不建立会话。
+     * 记录违规、通知管理员并断开玩家，不建立会话。试运行模式下不实际踢出。
      */
     public void rejectImmediate(String uuid, String playerName, KickMessage msg) {
+        MacConfig cfg = configManager.current();
+        msg = decorate(msg);
+        if (cfg.isDryRun()) {
+            logViolationOnly(uuid, playerName, "试运行(未拦截): " + msg.summary());
+            bridge.notifyOps("试运行: " + playerName + " -> " + msg.summary() + "（未实际踢出）");
+            return;
+        }
         violations.addFirst(new ViolationRecord(Instant.now().toEpochMilli(),
                 playerName, uuid, msg.summary()));
         while (violations.size() > Mac.MAX_VIOLATION_LOG) {
             violations.removeLast();
         }
-        if (configManager.current().isLogViolations()) {
+        if (cfg.isLogViolations()) {
             Mac.logger().info("[MAC] 预拦截玩家 {}: {}", playerName, msg.summary());
         }
         bridge.notifyOps("违规拦截: " + playerName + " -> " + msg.summary());
@@ -287,6 +373,11 @@ public final class MacService {
         out.add("白名单数量: " + c.getPolicy().getWhitelist().size());
         out.add("黑名单数量: " + c.getPolicy().getBlacklist().size());
         out.add("忽略列表: " + c.getIgnoredModIds());
+        out.add("试运行(不踢): " + c.isDryRun());
+        out.add("豁免: " + c.getExemptPlayers().size() + " 条"
+                + (c.isExemptOps() ? "（默认豁免 OP）" : ""));
+        out.add("允许的本模组版本: "
+                + (c.getAllowedMacVersions().isEmpty() ? "全部" : c.getAllowedMacVersions()));
         int verified = 0;
         int pending = 0;
         for (Session s : sessions.values()) {
@@ -318,7 +409,132 @@ public final class MacService {
         return null;
     }
 
+    /** 查看玩家历史 Mod 记录（管理命令 /mac audit）；无记录返回空列表。 */
+    public List<String> auditLines(String nameOrUuid) {
+        List<ModRecord> recs = history.forPlayer(nameOrUuid);
+        if (recs.isEmpty()) {
+            return List.of();
+        }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss")
+                .withZone(ZoneId.systemDefault());
+        List<String> out = new ArrayList<>();
+        int shown = 0;
+        for (ModRecord r : recs) {
+            if (shown++ >= 10) {
+                break;
+            }
+            List<ClientMod> mods = r.mods == null ? List.of() : r.mods;
+            StringBuilder sb = new StringBuilder();
+            sb.append(fmt.format(Instant.ofEpochMilli(r.t))).append(' ')
+                    .append('[').append(r.result).append("] ")
+                    .append(r.name == null ? "?" : r.name)
+                    .append(" | ").append(r.loader == null ? "?" : r.loader)
+                    .append('/').append(r.loaderVersion == null ? "?" : r.loaderVersion)
+                    .append(" | ").append(mods.size()).append(" 个Mod: ");
+            List<String> parts = new ArrayList<>();
+            for (int i = 0; i < mods.size() && i < 12; i++) {
+                ClientMod m = mods.get(i);
+                parts.add(m.id + (m.version == null || m.version.isBlank() ? "" : "@" + m.version));
+            }
+            if (mods.size() > 12) {
+                parts.add("…");
+            }
+            sb.append(String.join(", ", parts));
+            out.add(sb.toString());
+        }
+        return out;
+    }
+
+    /**
+     * 把玩家最近一次 Mod 清单（在线会话优先，否则最近历史记录）整体加入
+     * 白名单或黑名单（跳过恒忽略项）。返回命令回显文本。
+     */
+    public String learn(String nameOrUuid, boolean toWhitelist) {
+        MacConfig cfg = configManager.current();
+        String targetName = toWhitelist ? "白名单" : "黑名单";
+        List<ClientMod> src;
+        String sourceDesc;
+        Session live = null;
+        for (Session s : sessions.values()) {
+            if (s.phase() == Phase.VERIFIED
+                    && (s.uuid().equalsIgnoreCase(nameOrUuid) || s.name().equalsIgnoreCase(nameOrUuid))) {
+                live = s;
+                break;
+            }
+        }
+        if (live != null) {
+            src = live.fullList();
+            sourceDesc = "在线完整清单";
+        } else {
+            ModRecord rec = history.latestFor(nameOrUuid);
+            if (rec == null) {
+                return "找不到玩家 " + nameOrUuid + " 的在线会话或历史 Mod 记录。";
+            }
+            src = rec.mods;
+            sourceDesc = "最近一次记录";
+        }
+        Set<String> ignore = ignoredIds(cfg);
+        List<String> target = toWhitelist
+                ? cfg.getPolicy().getWhitelist() : cfg.getPolicy().getBlacklist();
+        List<String> added = new ArrayList<>();
+        int dup = 0;
+        int skip = 0;
+        if (src != null) {
+            for (ClientMod m : src) {
+                if (m == null || m.id == null) {
+                    continue;
+                }
+                if (ignore.contains(m.id)) {
+                    skip++;
+                    continue;
+                }
+                if (target.stream().anyMatch(i -> i.equalsIgnoreCase(m.id))) {
+                    dup++;
+                    continue;
+                }
+                target.add(m.id);
+                added.add(m.id);
+            }
+        }
+        configManager().save();
+        StringBuilder sb = new StringBuilder();
+        sb.append("已用玩家 ").append(nameOrUuid).append(" 的").append(sourceDesc)
+                .append("更新").append(targetName).append("：新增 ").append(added.size())
+                .append("，已存在 ").append(dup).append("，跳过 ").append(skip);
+        if (!added.isEmpty()) {
+            int n = Math.min(added.size(), 8);
+            sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
+        }
+        return sb.toString();
+    }
+
     // ------------------------------------------------------------------ 内部实现
+
+    /** 为断开消息附加配置的“底部提示区”文案。 */
+    private KickMessage decorate(KickMessage msg) {
+        return msg.withFooter(FeedbackText.footer(msg.reason(), configManager.current()));
+    }
+
+    /** 只记录一条违规（试运行等不实际断线场景），并受 logViolations 控制日志。 */
+    private void logViolationOnly(String uuid, String playerName, String summary) {
+        violations.addFirst(new ViolationRecord(Instant.now().toEpochMilli(),
+                playerName, uuid, summary));
+        while (violations.size() > Mac.MAX_VIOLATION_LOG) {
+            violations.removeLast();
+        }
+        if (configManager.current().isLogViolations()) {
+            Mac.logger().info("[MAC] {}", summary);
+        }
+    }
+
+    /** 若会话已有完整 Mod 清单则写入历史记录（防止重复记录空清单）。 */
+    private void recordHistory(Session s, String result) {
+        if (s.fullList().isEmpty()) {
+            return;
+        }
+        history.append(new ModRecord(Instant.now().toEpochMilli(), s.uuid(), s.name(),
+                s.loaderType(), s.loaderVersion(), s.macVersion(), result, s.fullList()));
+    }
 
     /** 是否对当前服务器连接启用准入强制（供适配层在加入瞬间做预拦截判断）。 */
     public boolean shouldEnforce() {
@@ -405,9 +621,26 @@ public final class MacService {
     }
 
     private void deny(Session s, KickMessage msg) {
+        MacConfig cfg = configManager.current();
+        msg = decorate(msg);
+        if (cfg.isDryRun()) {
+            // 试运行：只记录 / 告警，不踢出；会话置 VERIFIED 避免同阶段反复告警，
+            // 后续定期复检仍会按间隔再次触发（用于观察规则效果）。
+            recordViolation(s, msg);
+            recordHistory(s, ModRecord.RESULT_REJECTED);
+            if (cfg.isLogViolations()) {
+                Mac.logger().info("[MAC][试运行] 本将拒绝玩家 {}: {}", s.name(), msg.summary());
+            }
+            bridge.notifyOps("试运行: " + s.name() + " -> " + msg.summary() + "（未实际踢出）");
+            s.phase(Phase.VERIFIED);
+            s.deadlineTick(0);
+            s.lastRecheckTick(tick);
+            return;
+        }
         s.phase(Phase.FAILED);
         recordViolation(s, msg);
-        if (configManager.current().isLogViolations()) {
+        recordHistory(s, ModRecord.RESULT_REJECTED);
+        if (cfg.isLogViolations()) {
             Mac.logger().info("[MAC] 拒绝玩家 {} 进入: {}", s.name(), msg.summary());
         }
         bridge.notifyOps("违规拦截: " + s.name() + " -> " + msg.summary());

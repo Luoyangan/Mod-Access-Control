@@ -14,6 +14,7 @@ public final class Keys {
     public static final String KICK_HEADER_LOADER = "mac.kick.header.loader";
     public static final String KICK_HEADER_TIMEOUT = "mac.kick.header.timeout";
     public static final String KICK_HEADER_VIOLATION = "mac.kick.header.violation";
+    public static final String KICK_HEADER_MAC_VERSION = "mac.kick.header.mac_version";
     public static final String KICK_FOOTER_HINT = "mac.kick.hint";
 
     public static final String LINE_MISSING_REQUIRED = "mac.line.missing_required";

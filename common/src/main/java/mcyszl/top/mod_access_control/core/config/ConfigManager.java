@@ -41,6 +41,7 @@ public final class ConfigManager {
             if (parsed == null) {
                 throw new JsonSyntaxException("empty config");
             }
+            parsed.normalize();
             this.current = parsed;
             Mac.logger().info("[MAC] 配置文件加载成功: {}", file);
         } catch (Exception e) {
