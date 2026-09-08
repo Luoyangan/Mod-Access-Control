@@ -1,12 +1,13 @@
 # Mod Access Control（模组准入控制）
 
-面向 **Minecraft 1.21.1** 的跨平台 **服务端** Mod：通过统一协议、服务端规则配置与
+面向 **Minecraft 1.21.1 / 1.20.1** 的跨平台 **服务端** Mod：通过统一协议、服务端规则配置与
 **两阶段握手校验**，对客户端的 Mod 组合实施安全准入控制。同一份规则与同一套协议，
 在 **Forge / Fabric / NeoForge** 三种加载器上行为一致。
 
 - Mod id（三端一致）：`mod_access_control`
 - 协议版本：`1`
 - 加载器标识：`forge` / `fabric` / `neoforge`（握手阶段上报，供严格模式比对）
+- 支持版本：**1.21.1**（Forge / Fabric / NeoForge）、**1.20.1**（Forge / Fabric / NeoForge）
 
 > 提示：**客户端也必须安装本模组** 才能完成握手；未安装的客户端会在加入瞬间被拦截
 > （`requireClientMod` 可关闭该强制，见配置）。
@@ -33,42 +34,52 @@
 ## 二、目录结构
 
 ```
-common/     # 跨加载器统一核心（纯 Java，不含任何加载器 / Minecraft 类）
-forge/      # Forge 适配层（Gradle 工程，已实测编译通过，Forge 52.0.50）
-fabric/     # Fabric 适配层（Fabric Loom / Loader 0.19.5 / Fabric API 0.116.17+1.21.1）
-neoforge/   # NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
+common/               # 跨加载器统一核心（纯 Java，不含任何加载器 / Minecraft 类）
+versions/1.21.1/      # 1.21.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
+  ├─ forge/           # 1.21.1 Forge 适配层（Forge 52.0.50）
+  ├─ fabric/          # 1.21.1 Fabric 适配层（Loader 0.19.5 / Fabric API 0.116.17+1.21.1）
+  └─ neoforge/        # 1.21.1 NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
+versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
+  ├─ forge/           # 1.20.1 Forge 适配层（Forge 47.3.0）
+  ├─ fabric/          # 1.20.1 Fabric 适配层（Loader 0.15.11 / Fabric API 0.92.3+1.20.1）
+  └─ neoforge/        # 1.20.1 NeoForge 适配层（NeoForge 47.1.106，NeoGradle userdev）
 ```
 
-三个加载器产物使用完全相同的：
+所有版本 / 加载器产物使用完全相同的：
 - `common` 核心逻辑（规则模型 / 校验引擎 / 会话状态机 / 协议 DTO）；
 - 配置文件格式（`config/mod_access_control.json`）与字段语义；
 - 网络协议（4 个逻辑消息：`stage1_req / stage1_resp / stage2_req / stage2_resp`，负载为 JSON 字符串）；
 - `/mac` 命令体系。
 
-仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换）、
-服务器事件接线、配置文件路径与日志桥。
+仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换 /
+1.20.1 与 1.21.1 的版本化网络 API 差异）、服务器事件接线、配置文件路径与日志桥。
 
-> 说明：Forge、Fabric、NeoForge 三端产物均经本机真实 `gradle build` 编译验证通过
-> （JDK 21；构建期间对 NeoForge maven 使用 IPv6 路由：`JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`）。
+> 说明：1.21.1 三端与 1.20.1 两端产物均经本机真实 `gradle build` 编译验证通过
+> （1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取）。构建期间对 NeoForge maven
+> 使用 IPv6 路由：`JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
 
 ---
 
 ## 三、构建
 
-各自在对应目录执行（JDK 21，Gradle 8.8 wrapper 已内置）：
+各自在对应目录执行（Gradle 8.8 wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链）：
 
 ```powershell
-# Forge（已实测通过）
-cd forge
-.\gradlew.bat build        # 产物：forge/build/libs/mod_access_control-1.0.0.jar
-
-# Fabric（已实测通过）
+# 1.21.1 三端（Forge / Fabric / NeoForge，均已实测通过；需 JDK 21）
+cd versions\1.21.1\forge
+.\gradlew.bat build      # 产物：versions/1.21.1/forge/build/libs/mod-access-control-forge-1.21.1-1.0.0.jar
 cd ..\fabric
-.\gradlew.bat build
-
-# NeoForge（已实测通过）
+.\gradlew.bat build      # 产物：versions/1.21.1/fabric/build/libs/mod-access-control-fabric-1.21.1-1.0.0.jar
 cd ..\neoforge
-.\gradlew.bat build
+.\gradlew.bat build      # 产物：versions/1.21.1/neoforge/build/libs/mod-access-control-neoforge-1.21.1-1.0.0.jar
+
+# 1.20.1 三端（自动获取 JDK 17 工具链）
+cd ..\..\1.20.1\forge
+.\gradlew.bat build      # 产物：versions/1.20.1/forge/build/libs/mod-access-control-forge-1.20.1-1.0.0.jar
+cd ..\fabric
+.\gradlew.bat build      # 产物：versions/1.20.1/fabric/build/libs/mod-access-control-fabric-1.20.1-1.0.0.jar
+cd ..\neoforge
+.\gradlew.bat build      # 产物：versions/1.20.1/neoforge/build/libs/mod-access-control-neoforge-1.20.1-1.0.0.jar
 ```
 
 调试运行（`client` / `server` run 任务）分别见各模块 `build.gradle`。

@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Client",
+      "presentation": {
+        "group": "Mod Development - mod-access-control-neoforge",
+        "order": 0
+      },
+      "projectName": "mod-access-control-neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\build\\moddev\\clientRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmod_access_control%%D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\run",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Server",
+      "presentation": {
+        "group": "Mod Development - mod-access-control-neoforge",
+        "order": 1
+      },
+      "projectName": "mod-access-control-neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\build\\moddev\\serverRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmod_access_control%%D:\\java xm\\Mod Access Control\\versions\\1.21.1\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\run",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    }
+  ]
+}
