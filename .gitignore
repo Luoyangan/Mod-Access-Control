@@ -120,3 +120,10 @@ run-*/
 !gradle-wrapper.jar
 
 /wiki/
+/.trae/
+
+# IDE 配置
+.vscode/
+
+# 编译输出目录（IntelliJ / Eclipse 产物）
+**/bin/
