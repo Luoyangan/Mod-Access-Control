@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2026 mcyszl.top (Luoyangan)
+
 package mcyszl.top.mod_access_control.core.feedback;
 
 import mcyszl.top.mod_access_control.core.model.MacConfig;

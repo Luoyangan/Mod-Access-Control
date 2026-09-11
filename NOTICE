@@ -1,0 +1,19 @@
+Mod Access Control (模组准入控制)
+Copyright 2024-2026 原生之旅 | mcyszl.top Luoyangan
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file in the project root for the full license text.
+
+================================================================================
+Third-party components redistributed in this repository
+================================================================================
+
+Gradle Wrapper
+  Copyright the Gradle authors.
+  Licensed under the Apache License, Version 2.0.
+  Redistributed as, in each module directory:
+    gradlew
+    gradlew.bat
+    gradle/wrapper/gradle-wrapper.jar
+    gradle/wrapper/gradle-wrapper.properties
+  Upstream: https://github.com/gradle/gradle

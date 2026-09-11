@@ -10,7 +10,7 @@
   "contact": {
     "sources": "https://github.com/mcyszl/mod-access-control"
   },
-  "license": "GNU GPL 3.0",
+  "license": "Apache-2.0",
   "environment": "*",
   "entrypoints": {
     "main": [
