@@ -1,0 +1,16 @@
+[
+{
+  "modid": "mod_access_control",
+  "name": "Mod Access Control",
+  "description": "Client mod admission control for Minecraft servers. A unified two-phase handshake verifies protocol, loader, required mods and whitelist/blacklist policies. (模组准入控制)",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "https://github.com/Luoyangan/Mod-Access-Control",
+  "updateUrl": "",
+  "authorList": ["Luoyangan"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]

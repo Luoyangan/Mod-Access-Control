@@ -31,6 +31,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -265,7 +267,7 @@ public final class MacService {
             Mac.logger().warn("[MAC] 忽略异常次序的 stage2 响应: {}", uuid);
             return;
         }
-        List<ClientMod> mods = resp.mods == null ? List.of() : resp.mods;
+        List<ClientMod> mods = resp.mods == null ? Collections.<ClientMod>emptyList() : resp.mods;
         s.fullList().clear();
         s.fullList().addAll(mods);
         List<Problem> problems = runFullCheck(s);
@@ -413,7 +415,7 @@ public final class MacService {
     public List<String> auditLines(String nameOrUuid) {
         List<ModRecord> recs = history.forPlayer(nameOrUuid);
         if (recs.isEmpty()) {
-            return List.of();
+            return Collections.emptyList();
         }
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss")
                 .withZone(ZoneId.systemDefault());
@@ -423,7 +425,7 @@ public final class MacService {
             if (shown++ >= 10) {
                 break;
             }
-            List<ClientMod> mods = r.mods == null ? List.of() : r.mods;
+            List<ClientMod> mods = r.mods == null ? Collections.<ClientMod>emptyList() : r.mods;
             StringBuilder sb = new StringBuilder();
             sb.append(fmt.format(Instant.ofEpochMilli(r.t))).append(' ')
                     .append('[').append(r.result).append("] ")
@@ -434,7 +436,7 @@ public final class MacService {
             List<String> parts = new ArrayList<>();
             for (int i = 0; i < mods.size() && i < 12; i++) {
                 ClientMod m = mods.get(i);
-                parts.add(m.id + (m.version == null || m.version.isBlank() ? "" : "@" + m.version));
+                parts.add(m.id + (m.version == null || m.version.trim().isEmpty() ? "" : "@" + m.version));
             }
             if (mods.size() > 12) {
                 parts.add("…");
@@ -557,26 +559,21 @@ public final class MacService {
     private Set<String> ignoredIds(MacConfig cfg) {
         Set<String> set = new HashSet<>();
         set.add(Mac.MOD_ID);
-        set.addAll(List.of(Mac.ALWAYS_IGNORED_MODS));
+        set.addAll(Arrays.asList(Mac.ALWAYS_IGNORED_MODS));
         set.add(bridge.loaderType());
         // 各加载器自身的“基础设施”mod：不属于可被玩家控制的游戏内容，恒不参与黑白名单。
-        switch (bridge.loaderType().toLowerCase()) {
-            case Mac.LOADER_FORGE -> {
-                set.add("forge");
-                set.add("fmlonly");
-                set.add("javafml");
-            }
-            case Mac.LOADER_FABRIC -> {
-                set.add("fabricloader");
-                set.add("fabric-api");
-                set.add("fabric");
-            }
-            case Mac.LOADER_NEOFORGE -> {
-                set.add("neoforge");
-                set.add("javafml");
-            }
-            default -> {
-            }
+        String loader = bridge.loaderType().toLowerCase();
+        if (Mac.LOADER_FORGE.equals(loader)) {
+            set.add("forge");
+            set.add("fmlonly");
+            set.add("javafml");
+        } else if (Mac.LOADER_FABRIC.equals(loader)) {
+            set.add("fabricloader");
+            set.add("fabric-api");
+            set.add("fabric");
+        } else if (Mac.LOADER_NEOFORGE.equals(loader)) {
+            set.add("neoforge");
+            set.add("javafml");
         }
         if (cfg.getIgnoredModIds() != null) {
             set.addAll(cfg.getIgnoredModIds());

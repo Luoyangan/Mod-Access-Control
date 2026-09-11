@@ -3,6 +3,7 @@ package mcyszl.top.mod_access_control.core.feedback;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -23,15 +24,19 @@ public final class FeedbackText {
      * 注意：仅负责“提示区”，标题与逐条原因仍由适配层渲染。
      */
     public static String hintFor(DisconnectReason reason) {
-        return switch (reason) {
-            case NO_CLIENT_MOD, PROTOCOL_MISMATCH, LOADER_MISMATCH ->
-                    "提示：请按服务器要求安装正确的模组版本后重新加入。";
-            case HANDSHAKE_TIMEOUT -> "提示：如多次失败，请尝试更新游戏/模组版本后重连。";
-            case POLICY_VIOLATION ->
-                    "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。";
-            case MAC_VERSION_NOT_ALLOWED ->
-                    "提示：请把 Mod Access Control 更新/切换到服务器要求的版本后重新加入。";
-        };
+        switch (reason) {
+            case NO_CLIENT_MOD:
+            case PROTOCOL_MISMATCH:
+            case LOADER_MISMATCH:
+                return "提示：请按服务器要求安装正确的模组版本后重新加入。";
+            case HANDSHAKE_TIMEOUT:
+                return "提示：如多次失败，请尝试更新游戏/模组版本后重连。";
+            case POLICY_VIOLATION:
+                return "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。";
+            case MAC_VERSION_NOT_ALLOWED:
+            default:
+                return "提示：请把 Mod Access Control 更新/切换到服务器要求的版本后重新加入。";
+        }
     }
 
     /**
@@ -40,7 +45,7 @@ public final class FeedbackText {
      */
     public static List<String> footer(DisconnectReason reason, MacConfig cfg) {
         if (cfg == null || !cfg.isKickFooterEnabled()) {
-            return List.of();
+            return Collections.emptyList();
         }
         List<String> out = new ArrayList<>();
         String hint = hintFor(reason);
@@ -49,7 +54,7 @@ public final class FeedbackText {
         }
         if (cfg.getKickFooterLines() != null) {
             for (String line : cfg.getKickFooterLines()) {
-                if (line != null && !line.isBlank()) {
+                if (line != null && !line.trim().isEmpty()) {
                     out.add(line.trim());
                 }
             }

@@ -80,10 +80,10 @@ public final class SemVer implements Comparable<SemVer> {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof SemVer semVer)) {
+        if (!(o instanceof SemVer)) {
             return false;
         }
-        return compareTo(semVer) == 0;
+        return compareTo((SemVer) o) == 0;
     }
 
     @Override

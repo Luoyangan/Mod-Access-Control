@@ -40,8 +40,8 @@ public final class ModHistoryStore {
             if (file.getParent() != null) {
                 Files.createDirectories(file.getParent());
             }
-            Files.writeString(file, Json.toJson(rec) + System.lineSeparator(),
-                    StandardCharsets.UTF_8,
+            Files.write(file, (Json.toJson(rec) + System.lineSeparator())
+                            .getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             if (++writes % 64 == 0) {
                 trimIfNeeded();
@@ -103,7 +103,7 @@ public final class ModHistoryStore {
         }
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-                if (line.isBlank()) {
+                if (line.trim().isEmpty()) {
                     continue;
                 }
                 try {

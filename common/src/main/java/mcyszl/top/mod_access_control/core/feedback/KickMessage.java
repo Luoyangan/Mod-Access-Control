@@ -3,6 +3,7 @@ package mcyszl.top.mod_access_control.core.feedback;
 import mcyszl.top.mod_access_control.core.validate.Problem;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -20,7 +21,7 @@ public final class KickMessage {
     private final List<String> footer;
 
     public KickMessage(DisconnectReason reason, String[] headerArgs, List<Problem> problems) {
-        this(reason, headerArgs, problems, List.of());
+        this(reason, headerArgs, problems, Collections.emptyList());
     }
 
     public KickMessage(DisconnectReason reason, String[] headerArgs, List<Problem> problems,
@@ -28,11 +29,11 @@ public final class KickMessage {
         this.reason = reason;
         this.headerArgs = headerArgs == null ? new String[0] : headerArgs;
         this.problems = problems == null ? new ArrayList<>() : problems;
-        this.footer = footer == null ? List.of() : footer;
+        this.footer = footer == null ? Collections.emptyList() : footer;
     }
 
     public static KickMessage simple(DisconnectReason reason, String... args) {
-        return new KickMessage(reason, args, List.of());
+        return new KickMessage(reason, args, Collections.emptyList());
     }
 
     public static KickMessage violation(List<Problem> problems) {

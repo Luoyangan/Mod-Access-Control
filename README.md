@@ -66,20 +66,7 @@ versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 G
 
 ```powershell
 # 1.21.1 三端（Forge / Fabric / NeoForge，均已实测通过；需 JDK 21）
-cd versions\1.21.1\forge
-.\gradlew.bat build      # 产物：versions/1.21.1/forge/build/libs/mod-access-control-forge-1.21.1-1.0.0.jar
-cd ..\fabric
-.\gradlew.bat build      # 产物：versions/1.21.1/fabric/build/libs/mod-access-control-fabric-1.21.1-1.0.0.jar
-cd ..\neoforge
-.\gradlew.bat build      # 产物：versions/1.21.1/neoforge/build/libs/mod-access-control-neoforge-1.21.1-1.0.0.jar
-
-# 1.20.1 三端（自动获取 JDK 17 工具链）
-cd ..\..\1.20.1\forge
-.\gradlew.bat build      # 产物：versions/1.20.1/forge/build/libs/mod-access-control-forge-1.20.1-1.0.0.jar
-cd ..\fabric
-.\gradlew.bat build      # 产物：versions/1.20.1/fabric/build/libs/mod-access-control-fabric-1.20.1-1.0.0.jar
-cd ..\neoforge
-.\gradlew.bat build      # 产物：versions/1.20.1/neoforge/build/libs/mod-access-control-neoforge-1.20.1-1.0.0.jar
+.\gradlew.bat build
 ```
 
 调试运行（`client` / `server` run 任务）分别见各模块 `build.gradle`。

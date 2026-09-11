@@ -96,7 +96,7 @@ public class RequiredModRule {
         minVersion = blankToNull(minVersion);
         maxVersion = blankToNull(maxVersion);
         exactVersion = blankToNull(exactVersion);
-        bounds.removeIf(b -> b == null || b.version == null || b.version.isBlank());
+        bounds.removeIf(b -> b == null || b.version == null || b.version.trim().isEmpty());
         for (Bound b : bounds) {
             b.version = b.version.trim();
             b.op = Bound.canonicalOp(b.op);
@@ -109,7 +109,7 @@ public class RequiredModRule {
         minVersion = null;
         maxVersion = null;
         exactVersion = null;
-        if (spec == null || spec.isBlank()) {
+        if (spec == null || spec.trim().isEmpty()) {
             return;
         }
         String[] toks = spec.trim().split("\\s+");
@@ -136,10 +136,10 @@ public class RequiredModRule {
             // 区间 a~b（两端可省略）
             if (t.contains("~")) {
                 String[] range = t.split("~", 2);
-                if (!range[0].isBlank()) {
+                if (!range[0].trim().isEmpty()) {
                     bounds.add(new Bound(">=", range[0]));
                 }
-                if (range.length > 1 && !range[1].isBlank()) {
+                if (range.length > 1 && !range[1].trim().isEmpty()) {
                     bounds.add(new Bound("<=", range[1]));
                 }
                 continue;
@@ -154,12 +154,12 @@ public class RequiredModRule {
                 op = t.substring(0, 1);
                 ver = t.substring(1);
             }
-            if (op != null && !ver.isBlank()) {
+            if (op != null && !ver.trim().isEmpty()) {
                 bounds.add(new Bound(op, ver));
             }
             // 其余裸 token 忽略（避免误把无法解析的内容当约束）
         }
-        bounds.removeIf(b -> b.version == null || b.version.isBlank());
+        bounds.removeIf(b -> b.version == null || b.version.trim().isEmpty());
     }
 
     /** 人类可读的约束描述（用于提示信息 / 违规文案）。 */

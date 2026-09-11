@@ -7,6 +7,7 @@ import mcyszl.top.mod_access_control.core.network.MacPackets.ClientMod;
 import mcyszl.top.mod_access_control.core.version.SemVer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +41,7 @@ public final class RuleEngine {
         if (rules == null || rules.isEmpty()) {
             return problems;
         }
-        Map<String, String> cv = clientVersions == null ? Map.of() : clientVersions;
+        Map<String, String> cv = clientVersions == null ? Collections.emptyMap() : clientVersions;
         for (RequiredModRule rule : rules) {
             String actual = cv.get(rule.getId());
             boolean present = actual != null && !actual.isEmpty();
@@ -76,7 +77,7 @@ public final class RuleEngine {
         if (clientMods == null || activePolicy == null || activePolicy == PolicyMode.SWITCH) {
             return problems;
         }
-        Set<String> ignore = ignoredIds == null ? Set.of() : ignoredIds;
+        Set<String> ignore = ignoredIds == null ? Collections.emptySet() : ignoredIds;
         for (ClientMod mod : clientMods) {
             if (mod.id == null || ignore.contains(mod.id)) {
                 continue;
@@ -133,14 +134,25 @@ public final class RuleEngine {
             return "!=".equals(bound.getOp());
         }
         int c = actual.compareTo(want);
-        return switch (bound.getOp()) {
-            case "=" -> c == 0;
-            case "!=" -> c != 0;
-            case ">" -> c > 0;
-            case ">=" -> c >= 0;
-            case "<" -> c < 0;
-            case "<=" -> c <= 0;
-            default -> true;
-        };
+        String op = bound.getOp();
+        if ("=".equals(op)) {
+            return c == 0;
+        }
+        if ("!=".equals(op)) {
+            return c != 0;
+        }
+        if (">".equals(op)) {
+            return c > 0;
+        }
+        if (">=".equals(op)) {
+            return c >= 0;
+        }
+        if ("<".equals(op)) {
+            return c < 0;
+        }
+        if ("<=".equals(op)) {
+            return c <= 0;
+        }
+        return true;
     }
 }

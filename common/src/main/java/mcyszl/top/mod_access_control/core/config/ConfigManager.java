@@ -36,7 +36,7 @@ public final class ConfigManager {
             return;
         }
         try {
-            String text = Files.readString(file, StandardCharsets.UTF_8);
+            String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
             MacConfig parsed = Json.gson().fromJson(text, MacConfig.class);
             if (parsed == null) {
                 throw new JsonSyntaxException("empty config");
@@ -71,7 +71,7 @@ public final class ConfigManager {
         try {
             Files.createDirectories(file.getParent());
             Gson pretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-            Files.writeString(file, pretty.toJson(current), StandardCharsets.UTF_8);
+            Files.write(file, pretty.toJson(current).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             Mac.logger().warn("[MAC] 配置保存失败: {}", e.getMessage());
         }
@@ -87,7 +87,8 @@ public final class ConfigManager {
     /** 仅用于外部校验 JSON 语法。 */
     public static boolean isJson(String text) {
         try {
-            JsonParser.parseString(text);
+            // Gson 2.8.0（MC 1.12.2 自带）无静态 parseString，使用实例方法保持全版本兼容
+            new JsonParser().parse(text);
             return true;
         } catch (JsonSyntaxException e) {
             return false;
