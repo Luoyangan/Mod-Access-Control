@@ -1,13 +1,12 @@
 # Mod Access Control（模组准入控制）
 
-面向 **Minecraft 1.21.1 / 1.20.1** 的跨平台 **服务端** Mod：通过统一协议、服务端规则配置与
+面向 **Minecraft** 的 **服务端** Mod：通过统一协议、服务端规则配置与
 **两阶段握手校验**，对客户端的 Mod 组合实施安全准入控制。同一份规则与同一套协议，
 在 **Forge / Fabric / NeoForge** 三种加载器上行为一致。
 
 - Mod id（三端一致）：`mod_access_control`
 - 协议版本：`1`
 - 加载器标识：`forge` / `fabric` / `neoforge`（握手阶段上报，供严格模式比对）
-- 支持版本：**1.21.1**（Forge / Fabric / NeoForge）、**1.20.1**（Forge / Fabric / NeoForge）
 
 > 提示：**客户端也必须安装本模组** 才能完成握手；未安装的客户端会在加入瞬间被拦截
 > （`requireClientMod` 可关闭该强制，见配置）。
@@ -43,6 +42,8 @@ versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 G
   ├─ forge/           # 1.20.1 Forge 适配层（Forge 47.3.0）
   ├─ fabric/          # 1.20.1 Fabric 适配层（Loader 0.15.11 / Fabric API 0.92.3+1.20.1）
   └─ neoforge/        # 1.20.1 NeoForge 适配层（NeoForge 47.1.106，NeoGradle userdev）
+versions/1.16.5/      # 1.16.5 版本目录
+  └─ forge/           # 1.16.5 Forge 适配层（Forge 36.2.42，ForgeGradle 4.1，Java 8）
 ```
 
 所有版本 / 加载器产物使用完全相同的：
@@ -54,18 +55,18 @@ versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 G
 仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换 /
 1.20.1 与 1.21.1 的版本化网络 API 差异）、服务器事件接线、配置文件路径与日志桥。
 
-> 说明：1.21.1 三端与 1.20.1 两端产物均经本机真实 `gradle build` 编译验证通过
-> （1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取）。构建期间对 NeoForge maven
+> 说明：1.21.1 三端、1.20.1 三端与 1.16.5 Forge 产物均经本机真实 `gradle build` 编译验证通过
+> （1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取；1.16.5 用 JDK 8）。构建期间对 NeoForge maven
 > 使用 IPv6 路由：`JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
 
 ---
 
 ## 三、构建
 
-各自在对应目录执行（Gradle 8.8 wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链）：
+各自在对应目录执行（Gradle wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链，
+1.16.5 由 `gradle.properties` 固定使用 JDK 8 运行构建）：
 
 ```powershell
-# 1.21.1 三端（Forge / Fabric / NeoForge，均已实测通过；需 JDK 21）
 .\gradlew.bat build
 ```
 
