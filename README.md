@@ -42,8 +42,11 @@ versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 G
   ├─ forge/           # 1.20.1 Forge 适配层（Forge 47.3.0）
   ├─ fabric/          # 1.20.1 Fabric 适配层（Loader 0.15.11 / Fabric API 0.92.3+1.20.1）
   └─ neoforge/        # 1.20.1 NeoForge 适配层（NeoForge 47.1.106，NeoGradle userdev）
-versions/1.16.5/      # 1.16.5 版本目录
-  └─ forge/           # 1.16.5 Forge 适配层（Forge 36.2.42，ForgeGradle 4.1，Java 8）
+versions/1.16.5/      # 1.16.5 版本目录（Forge / Fabric 独立 Gradle 工程）
+  ├─ forge/           # 1.16.5 Forge 适配层（Forge 36.2.42，ForgeGradle 4.1，Java 8）
+  └─ fabric/          # 1.16.5 Fabric 适配层（Loader 0.15.11 / Fabric API 0.41.3+1.16，Java 8）
+versions/1.12.2/      # 1.12.2 版本目录（Forge 独立 Gradle 工程）
+  └─ forge/           # 1.12.2 Forge 适配层（Forge 14.23.5.2847，ForgeGradle 2.3，Java 8）
 ```
 
 所有版本 / 加载器产物使用完全相同的：
@@ -55,16 +58,19 @@ versions/1.16.5/      # 1.16.5 版本目录
 仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换 /
 1.20.1 与 1.21.1 的版本化网络 API 差异）、服务器事件接线、配置文件路径与日志桥。
 
-> 说明：1.21.1 三端、1.20.1 三端与 1.16.5 Forge 产物均经本机真实 `gradle build` 编译验证通过
-> （1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取；1.16.5 用 JDK 8）。构建期间对 NeoForge maven
-> 使用 IPv6 路由：`JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
+> 说明：1.21.1 三端、1.20.1 三端、1.16.5 Forge/Fabric、1.12.2 Forge 产物均经本机真实
+> `gradle build` 编译验证通过（1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取；1.16.5
+> 用 JDK 17 + `--release 8` 编译出 Java 8 字节码；1.12.2 用 JDK 8 + Gradle 7.6.4 +
+> ForgeGradle 2.3 编译出 Java 8 字节码）。构建期间对 NeoForge maven 使用 IPv6 路由：
+> `JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
 
 ---
 
 ## 三、构建
 
 各自在对应目录执行（Gradle wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链，
-1.16.5 由 `gradle.properties` 固定使用 JDK 8 运行构建）：
+1.16.5 用 JDK 17 运行构建并以 `--release 8` 产出 Java 8 字节码；1.12.2 需 JDK 8，
+Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ```powershell
 .\gradlew.bat build

@@ -203,7 +203,7 @@ public final class FabricNet {
                 new CustomPacketPayload.Type<>(id("s1_req"));
         public static final StreamCodec<ByteBuf, Stage1RequestPayload> CODEC = StreamCodec.of(
                 (buf, p) -> fb(buf).writeUtf(p.json()),
-                buf -> new Stage1RequestPayload(fb(buf).readUtf()));
+                buf -> new Stage1RequestPayload(fb(buf).readUtf(32767)));
 
         @Override
         public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
@@ -217,7 +217,7 @@ public final class FabricNet {
                 new CustomPacketPayload.Type<>(id("s1_resp"));
         public static final StreamCodec<ByteBuf, Stage1ResponsePayload> CODEC = StreamCodec.of(
                 (buf, p) -> fb(buf).writeUtf(p.json()),
-                buf -> new Stage1ResponsePayload(fb(buf).readUtf()));
+                buf -> new Stage1ResponsePayload(fb(buf).readUtf(32767)));
 
         @Override
         public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
@@ -231,7 +231,7 @@ public final class FabricNet {
                 new CustomPacketPayload.Type<>(id("s2_req"));
         public static final StreamCodec<ByteBuf, Stage2RequestPayload> CODEC = StreamCodec.of(
                 (buf, p) -> fb(buf).writeUtf(p.json()),
-                buf -> new Stage2RequestPayload(fb(buf).readUtf()));
+                buf -> new Stage2RequestPayload(fb(buf).readUtf(32767)));
 
         @Override
         public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
@@ -245,7 +245,7 @@ public final class FabricNet {
                 new CustomPacketPayload.Type<>(id("s2_resp"));
         public static final StreamCodec<ByteBuf, Stage2ResponsePayload> CODEC = StreamCodec.of(
                 (buf, p) -> fb(buf).writeUtf(p.json()),
-                buf -> new Stage2ResponsePayload(fb(buf).readUtf()));
+                buf -> new Stage2ResponsePayload(fb(buf).readUtf(32767)));
 
         @Override
         public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {

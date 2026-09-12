@@ -23,20 +23,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Fabric 网络适配层（MC 1.20.1 / Fabric Loader 0.15.x）。
+ * Fabric 网络适配层（MC 1.16.5 / Fabric Loader 0.15.x / Fabric API 0.41.3+1.16）。
  *
  * <p>协议与 Forge / NeoForge 完全一致：四个逻辑消息（stage1_req / stage1_resp /
  * stage2_req / stage2_resp），负载均为一段 JSON 字符串（结构由 common 核心定义）。
  * 两阶段握手全部在 PLAY 相位完成。</p>
- *
- * <p>1.20.1 使用旧版频道体系（四个独立 {@link ResourceLocation} 频道 + 全局接收器，
- * 负载为 {@link FriendlyByteBuf}），与 1.21.1 的 CustomPacketPayload/StreamCodec
- * 不同；JSON 结构仍由 common 核心定义。</p>
  *
  * <p>说明：客户端 S2C 全局接收器在 {@code FabricClientMod}（client 入口点）中注册；
  * 本类仅做服务端 C2S 接收、服务端下发与“构建应答 JSON”等两侧共用的工作。</p>
@@ -51,6 +48,9 @@ public final class FabricNet {
 
     private FabricNet() {
     }
+
+    /** JSON 负载的最大字符数（与 writeUtf 默认 32767 上限一致）。 */
+    private static final int MAX_JSON = 32767;
 
     /** 在 main 入口点调用（专用服务器也会执行）：注册服务端 C2S 全局接收器。 */
     public static void init() {
@@ -105,9 +105,9 @@ public final class FabricNet {
     private static void onStage1Response(MinecraftServer server, ServerPlayer player,
                                          ServerGamePacketListenerImpl handler,
                                          FriendlyByteBuf buf, PacketSender responseSender) {
-        // 注意：拆分 jar 时代（<1.20.5）专用服务器可能没有 readUtf() 无参重载，
+        // 注意：1.16.5 专用服务器 jar 没有 readUtf() 无参重载（仅客户端 jar 有），
         // 必须使用两端都存在的 readUtf(int)。
-        String json = buf.readUtf(32767);
+        String json = buf.readUtf(MAX_JSON);
         server.execute(() -> {
             try {
                 Stage1Response resp = Json.fromJson(json, Stage1Response.class);
@@ -123,7 +123,7 @@ public final class FabricNet {
     private static void onStage2Response(MinecraftServer server, ServerPlayer player,
                                          ServerGamePacketListenerImpl handler,
                                          FriendlyByteBuf buf, PacketSender responseSender) {
-        String json = buf.readUtf(32767);
+        String json = buf.readUtf(MAX_JSON);
         server.execute(() -> {
             try {
                 Stage2Response resp = Json.fromJson(json, Stage2Response.class);
@@ -149,7 +149,8 @@ public final class FabricNet {
             resp.macVersion = localVersion(Mac.MOD_ID);
             Map<String, String> local = localVersions();
             resp.modVersions = new HashMap<>();
-            List<String> ids = req == null || req.requiredIds == null ? List.of() : req.requiredIds;
+            List<String> ids = req == null || req.requiredIds == null
+                    ? Collections.emptyList() : req.requiredIds;
             for (String rid : ids) {
                 resp.modVersions.put(rid, local.get(rid)); // 未安装 => null => 视为缺失
             }

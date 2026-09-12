@@ -7,10 +7,10 @@ import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.feedback.KickMessage;
 import mcyszl.top.mod_access_control.core.platform.PlatformBridge;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
-import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.api.EnvType;
-import net.minecraft.server.MinecraftServer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -26,9 +26,9 @@ public final class MacFabricBridge implements PlatformBridge {
     private static volatile MinecraftServer server;
 
     /**
-     * JOIN 事件里记住的玩家引用。Fabric 的 JOIN 事件可能早于玩家注册进
+     * JOIN 事件里记住的玩家引用。1.16.5 Fabric 的 JOIN 事件触发早于玩家注册进
      * {@code PlayerList.playersByUUID}，此时按 uuid 查列表会返回 null，
-     * 因此握手发包必须优先使用该引用（1.16.5 实测存在此时序问题）。
+     * 因此握手发包必须直接使用该引用。
      */
     private static final Map<String, ServerPlayer> JOINED = new ConcurrentHashMap<>();
 
@@ -101,7 +101,7 @@ public final class MacFabricBridge implements PlatformBridge {
         }
     }
 
-    /** JOIN 事件：直接记住玩家实例（时序可能早于玩家列表注册）。 */
+    /** JOIN 事件：直接记住玩家实例（时序早于玩家列表注册）。 */
     public static void onJoin(ServerPlayer sp) {
         JOINED.put(sp.getStringUUID(), sp);
     }

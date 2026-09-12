@@ -46,11 +46,13 @@ public final class FabricEvents {
             String name = sp.getGameProfile().getName();
             boolean hasChannel = ServerPlayNetworking.canSend(sp, FabricNet.STAGE1_REQUEST);
             boolean isOp = server.getPlayerList().isOp(sp.getGameProfile());
+            MacFabricBridge.onJoin(sp);
             Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayer sp = handler.getPlayer();
             if (sp != null) {
+                MacFabricBridge.onLeave(sp.getStringUUID());
                 Holder.service().onPlayerLeave(sp.getStringUUID());
             }
         });
