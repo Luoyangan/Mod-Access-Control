@@ -3,6 +3,7 @@
 
 package mcyszl.top.mod_access_control.neoforge;
 
+import mcyszl.top.mod_access_control.api.MacApi;
 import mcyszl.top.mod_access_control.core.Mac;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -21,6 +22,8 @@ public final class NeoMacMod {
     public NeoMacMod(IEventBus modEventBus) {
         Mac.setLogger(new NeoLog());
         Holder.init();
+        // 公共 API 门面：供以本模组为前置的其他 mod 调用
+        MacApi.install(new MacApiImpl(Holder.service()));
 
         // 服务端事件（专用服务器或集成服务器均可触发；enforce 范围由配置决定）
         NeoForge.EVENT_BUS.addListener(NeoEvents::onServerStarted);

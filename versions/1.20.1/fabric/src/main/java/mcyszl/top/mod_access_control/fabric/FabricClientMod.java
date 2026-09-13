@@ -7,6 +7,7 @@ import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
 
 /**
  * Fabric 客户端入口：注册 S2C 全局接收器，自动应答服务端的两阶段握手。
@@ -21,11 +22,20 @@ public final class FabricClientMod implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(FabricNet.STAGE1_REQUEST,
                 (client, handler, buf, responseSender) -> {
                     String json = buf.readUtf(32767);
-                    client.execute(() -> FabricNet.respondStage1(json));
+                    client.execute(() -> FabricNet.respondStage1(json, clientLanguage()));
                 });
         // S2C：收到完整列表请求 -> 回送完整 Mod 列表。
         ClientPlayNetworking.registerGlobalReceiver(FabricNet.STAGE2_REQUEST,
                 (client, handler, buf, responseSender) -> client.execute(FabricNet::respondStage2));
         Mac.logger().info("MAC Fabric 客户端握手接收器已注册");
+    }
+
+    /** 当前客户端界面语言（如 zh_cn）：随登录阶段应答上报，供服务端按玩家语言渲染文案。 */
+    private static String clientLanguage() {
+        try {
+            return Minecraft.getInstance().getLanguageManager().getSelected();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

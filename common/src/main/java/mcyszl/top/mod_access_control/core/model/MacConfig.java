@@ -65,7 +65,7 @@ public class MacConfig {
     /** 踢出消息底部“提示区”是否显示（原因明细行不受此开关影响）。默认开启。 */
     private boolean kickFooterEnabled = true;
 
-    /** 踢出消息底部提示区之后追加的自定义行（逐行展示），可为空。 */
+    /** 踢出消息底部“提示区”之后追加的自定义行（逐行展示），可为空。 */
     private List<String> kickFooterLines = new ArrayList<>();
 
     /**
@@ -73,6 +73,21 @@ public class MacConfig {
      * 空列表 = 放行任意版本（默认）。条目为大小写不敏感的版本字符串。
      */
     private List<String> allowedMacVersions = new ArrayList<>();
+
+    /** 服务端语言（命令 / 日志 / 管理广播文案）：auto | zh_cn | en_us。 */
+    private String language = "auto";
+
+    /**
+     * 踢出消息是否展示逐条违规明细（缺失 / 版本不符 / 违规 Mod 行）。
+     * 使用包装类型：旧配置缺字段时为 null，按“开启”处理（默认 true）。
+     */
+    private Boolean kickShowDetails = Boolean.TRUE;
+
+    /**
+     * 管理员广播是否展示逐条违规明细；关闭时只显示违规类型与数量。
+     * 旧配置缺字段时为 null，按“开启”处理（默认 true）。
+     */
+    private Boolean adminShowDetails = Boolean.TRUE;
 
     public int getConfigVersion() {
         return configVersion;
@@ -214,6 +229,40 @@ public class MacConfig {
         this.allowedMacVersions = allowedMacVersions == null ? new ArrayList<>() : allowedMacVersions;
     }
 
+    public String getLanguage() {
+        return language == null ? "auto" : language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language == null || language.trim().isEmpty() ? "auto" : language.trim();
+    }
+
+    /** 是否向被拒玩家展示逐条违规明细（旧配置缺字段时默认开启）。 */
+    public boolean showKickDetails() {
+        return kickShowDetails == null || kickShowDetails;
+    }
+
+    public Boolean getKickShowDetails() {
+        return kickShowDetails;
+    }
+
+    public void setKickShowDetails(Boolean kickShowDetails) {
+        this.kickShowDetails = kickShowDetails;
+    }
+
+    /** 是否向管理员广播展示逐条违规明细（旧配置缺字段时默认开启）。 */
+    public boolean showAdminDetails() {
+        return adminShowDetails == null || adminShowDetails;
+    }
+
+    public Boolean getAdminShowDetails() {
+        return adminShowDetails;
+    }
+
+    public void setAdminShowDetails(Boolean adminShowDetails) {
+        this.adminShowDetails = adminShowDetails;
+    }
+
     /**
      * 把反序列化后可能缺失的字段补齐默认值，保证旧版配置文件（缺少 v1.1 新增字段）
      * 加载后所有集合非空、枚举字段为合法键。
@@ -243,6 +292,7 @@ public class MacConfig {
                 r.normalize();
             }
         }
+        language = getLanguage();
     }
 
     /**
@@ -265,11 +315,11 @@ public class MacConfig {
          */
         private int recheckIntervalSeconds = 60;
 
-        /** 白名单（mod id 列表）。 */
-        private List<String> whitelist = new ArrayList<>();
+        /** 白名单（v1.1：条目为 mod id，支持 {@code *} 通配符与可选版本约束）。 */
+        private List<PolicyEntry> whitelist = new ArrayList<>();
 
-        /** 黑名单（mod id 列表）。 */
-        private List<String> blacklist = new ArrayList<>();
+        /** 黑名单（v1.1：条目为 mod id，支持 {@code *} 通配符与可选版本约束）。 */
+        private List<PolicyEntry> blacklist = new ArrayList<>();
 
         public PolicyMode mode() {
             return PolicyMode.byKey(mode);
@@ -304,19 +354,19 @@ public class MacConfig {
             this.recheckIntervalSeconds = Math.max(0, recheckIntervalSeconds);
         }
 
-        public List<String> getWhitelist() {
+        public List<PolicyEntry> getWhitelist() {
             return whitelist;
         }
 
-        public void setWhitelist(List<String> whitelist) {
+        public void setWhitelist(List<PolicyEntry> whitelist) {
             this.whitelist = whitelist == null ? new ArrayList<>() : whitelist;
         }
 
-        public List<String> getBlacklist() {
+        public List<PolicyEntry> getBlacklist() {
             return blacklist;
         }
 
-        public void setBlacklist(List<String> blacklist) {
+        public void setBlacklist(List<PolicyEntry> blacklist) {
             this.blacklist = blacklist == null ? new ArrayList<>() : blacklist;
         }
 

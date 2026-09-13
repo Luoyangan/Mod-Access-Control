@@ -27,6 +27,9 @@ sourceSets {
         java {
             srcDir '../../../common/src/main/java'
         }
+        resources {
+            srcDir '../../../common/src/main/resources'
+        }
     }
 }
 
@@ -47,6 +50,7 @@ dependencies {
 }
 
 processResources {
+    filteringCharset = 'UTF-8'
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') {
         expand 'version': project.version

@@ -1,0 +1,19 @@
+{
+  "mac.kick.header.no_client_mod": "Connection refused: the client does not have \"Mod Access Control\" installed.\nThis server requires all clients to install this mod for access verification.",
+  "mac.kick.header.protocol": "Access protocol version mismatch (server=%s, client=%s).\nPlease update the mod from the channel specified by the server.",
+  "mac.kick.header.loader": "Incompatible mod loader: the server requires %s, your client uses %s.\nPlease use the same mod loader as the server.",
+  "mac.kick.header.timeout": "Access verification timed out. If the mod is installed, restart the game and retry; if it persists, contact the server administrator.",
+  "mac.kick.header.violation": "Access verification failed. Problems found in your client mod list:",
+  "mac.kick.header.mac_version": "Connection refused: this mod version is not on the server's allow list.\nAllowed versions: %s; your version: %s.",
+  "mac.kick.hint.generic": "Hint: install the correct mod versions required by the server and rejoin.",
+  "mac.kick.hint.timeout": "Hint: if this keeps failing, try updating your game/mod version and reconnect.",
+  "mac.kick.hint.violation": "Hint: remove or add the mods listed above and rejoin; contact server staff if unsure.",
+  "mac.kick.hint.mac_version": "Hint: update or switch Mod Access Control to the version required by the server and rejoin.",
+  "mac.line.missing_required": "Missing required mod: %s (required %s)",
+  "mac.line.version_mismatch": "Mod version mismatch: %s (required %s, yours %s)",
+  "mac.line.not_whitelisted": "Mod outside the whitelist: %s (version %s)",
+  "mac.line.not_whitelisted_version": "Mod version mismatch: %s (allowed %s, yours %s)",
+  "mac.line.blacklisted": "Forbidden mod installed: %s (version %s)",
+  "mac.line.blacklisted_version": "Forbidden mod version: %s (forbidden %s, yours %s)",
+  "mac.line.loader": "Incompatible mod loader (expected %s, got %s)"
+}

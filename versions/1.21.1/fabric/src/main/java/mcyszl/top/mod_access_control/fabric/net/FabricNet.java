@@ -122,7 +122,7 @@ public final class FabricNet {
     // ------------------------------------------------------------------ 客户端应答构建
 
     /** 客户端应答 stage1（out 负责把结果包发回服务器）。 */
-    public static void respondStage1(String json, Consumer<CustomPacketPayload> out) {
+    public static void respondStage1(String json, String clientLanguage, Consumer<CustomPacketPayload> out) {
         try {
             Stage1Request req = Json.fromJson(json, Stage1Request.class);
             Stage1Response resp = new Stage1Response();
@@ -130,6 +130,7 @@ public final class FabricNet {
             resp.loaderType = Mac.LOADER_FABRIC;
             resp.loaderVersion = localVersion(Mac.LOADER_FABRIC);
             resp.macVersion = localVersion(Mac.MOD_ID);
+            resp.language = clientLanguage;
             Map<String, String> local = localVersions();
             resp.modVersions = new HashMap<>();
             List<String> ids = req == null || req.requiredIds == null ? List.of() : req.requiredIds;

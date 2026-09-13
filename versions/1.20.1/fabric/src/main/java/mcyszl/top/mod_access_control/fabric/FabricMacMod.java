@@ -3,6 +3,7 @@
 
 package mcyszl.top.mod_access_control.fabric;
 
+import mcyszl.top.mod_access_control.api.MacApi;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.api.ModInitializer;
@@ -21,6 +22,8 @@ public final class FabricMacMod implements ModInitializer {
         Holder.init();
         FabricNet.init();
         FabricEvents.init();
+        // 公共 API 门面：供以本模组为前置的其他 mod 调用
+        MacApi.install(new MacApiImpl(Holder.service()));
         Mac.logger().info("Mod Access Control (Fabric) 初始化完成 (loader={}, version={})",
                 Mac.LOADER_FABRIC, Holder.bridge().modVersion());
     }

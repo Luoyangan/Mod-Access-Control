@@ -49,6 +49,8 @@ public final class MacPackets {
         public String loaderVersion;
         @SerializedName("mac_version")
         public String macVersion;
+        /** 客户端界面语言（如 {@code zh_cn} / {@code en_us}），用于服务端按玩家语言渲染文案。 */
+        public String language;
         /** 每个必需 mod id -> 客户端本地版本；不存在则值为 null。 */
         @SerializedName("mod_versions")
         public Map<String, String> modVersions;

@@ -4,8 +4,9 @@
 **两阶段握手校验**，对客户端的 Mod 组合实施安全准入控制。同一份规则与同一套协议，
 在 **Forge / Fabric / NeoForge** 三种加载器上行为一致。
 
-- Mod id（三端一致）：`mod_access_control`
-- 协议版本：`1`
+- 当前版本：`1.1.1`（支持 MC 1.21.1 / 1.20.1 / 1.16.5 / 1.12.2）
+- Mod id（各端一致）：`mod_access_control`
+- 握手协议版本：`1`
 - 加载器标识：`forge` / `fabric` / `neoforge`（握手阶段上报，供严格模式比对）
 
 > 提示：**客户端也必须安装本模组** 才能完成握手；未安装的客户端会在加入瞬间被拦截
@@ -20,8 +21,12 @@
 | 两阶段握手 | 登录阶段（最小传输：协议/加载器/必需 Mod）+ 进入游戏阶段（完整 Mod 列表复核） |
 | 必需 Mod 校验 | `presence` 存在性 / `version_range` 版本范围 / `strict` 严格匹配 |
 | 策略系统 | `whitelist` / `blacklist` / `switch`（双模式 + 按间隔定期复检） |
-| 规则管理 | 启动读配置 + 游戏内 `/mac` 命令即时修改 / 查看 / 保存（枚举参数带自动补全） |
-| 玩家反馈 | 纯文本断开原因（缺失 / 版本不符 / 违规 Mod 明细）+ 底部提示区（可用自定义行） |
+| 黑白名单进阶（v1.1） | 条目支持 `*` 通配符与**可选版本约束**（如 `sodium >=1.0`）；未写约束 = 匹配全部版本 |
+| 多语言（v1.1） | 服务端文案（命令/日志/管理广播）随 `language` 配置切换 zh_cn / en_us；踢出消息统一由服务端按**客户端语言**渲染为纯文本下发，客户端界面与服务端日志显示一致（语言未知时回退服务端语言） |
+| 反馈明细开关（v1.1） | `kickShowDetails` 控制踢出消息是否逐条列出违规 Mod；`adminShowDetails` 控制管理员广播明细粒度 |
+| 公共 API（v1.1） | 其他 Mod 可把本模组声明为前置，调用 `MacApi` 查询玩家校验状态 / Mod 清单 / 管理豁免 / 订阅违规事件 |
+| 规则管理 | 启动读配置 + 游戏内 `/mac` 命令即时修改 / 查看 / 保存（枚举参数带自动补全，`/mac help [页码]` 分页帮助） |
+| 玩家反馈 | 双语断开原因（缺失 / 版本不符 / 违规 Mod 明细）+ 底部提示区（可用自定义行） |
 | 豁免 | `exemptPlayers` 玩家名 / `uuid:` 列表 + `exemptOps`，豁免者跳过全部校验与握手 |
 | 试运行 | `dryRun`：违规只记录 / 通知，不实际踢出，用于上线前验证规则避免误伤 |
 | Mod 历史 | 玩家客户端 Mod 清单持久记录（JSONL），支持 `/mac audit` 审计、`/mac learn` 一键建名单 |
@@ -30,57 +35,7 @@
 
 ---
 
-## 二、目录结构
-
-```
-common/               # 跨加载器统一核心（纯 Java，不含任何加载器 / Minecraft 类）
-versions/1.21.1/      # 1.21.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
-  ├─ forge/           # 1.21.1 Forge 适配层（Forge 52.0.50）
-  ├─ fabric/          # 1.21.1 Fabric 适配层（Loader 0.19.5 / Fabric API 0.116.17+1.21.1）
-  └─ neoforge/        # 1.21.1 NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
-versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
-  ├─ forge/           # 1.20.1 Forge 适配层（Forge 47.3.0）
-  ├─ fabric/          # 1.20.1 Fabric 适配层（Loader 0.15.11 / Fabric API 0.92.3+1.20.1）
-  └─ neoforge/        # 1.20.1 NeoForge 适配层（NeoForge 47.1.106，NeoGradle userdev）
-versions/1.16.5/      # 1.16.5 版本目录（Forge / Fabric 独立 Gradle 工程）
-  ├─ forge/           # 1.16.5 Forge 适配层（Forge 36.2.42，ForgeGradle 4.1，Java 8）
-  └─ fabric/          # 1.16.5 Fabric 适配层（Loader 0.15.11 / Fabric API 0.41.3+1.16，Java 8）
-versions/1.12.2/      # 1.12.2 版本目录（Forge 独立 Gradle 工程）
-  └─ forge/           # 1.12.2 Forge 适配层（Forge 14.23.5.2847，ForgeGradle 2.3，Java 8）
-```
-
-所有版本 / 加载器产物使用完全相同的：
-- `common` 核心逻辑（规则模型 / 校验引擎 / 会话状态机 / 协议 DTO）；
-- 配置文件格式（`config/mod_access_control.json`）与字段语义；
-- 网络协议（4 个逻辑消息：`stage1_req / stage1_resp / stage2_req / stage2_resp`，负载为 JSON 字符串）；
-- `/mac` 命令体系。
-
-仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换 /
-1.20.1 与 1.21.1 的版本化网络 API 差异）、服务器事件接线、配置文件路径与日志桥。
-
-> 说明：1.21.1 三端、1.20.1 三端、1.16.5 Forge/Fabric、1.12.2 Forge 产物均经本机真实
-> `gradle build` 编译验证通过（1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取；1.16.5
-> 用 JDK 17 + `--release 8` 编译出 Java 8 字节码；1.12.2 用 JDK 8 + Gradle 7.6.4 +
-> ForgeGradle 2.3 编译出 Java 8 字节码）。构建期间对 NeoForge maven 使用 IPv6 路由：
-> `JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
-
----
-
-## 三、构建
-
-各自在对应目录执行（Gradle wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链，
-1.16.5 用 JDK 17 运行构建并以 `--release 8` 产出 Java 8 字节码；1.12.2 需 JDK 8，
-Gradle 7.6.4 + ForgeGradle 2.3）：
-
-```powershell
-.\gradlew.bat build
-```
-
-调试运行（`client` / `server` run 任务）分别见各模块 `build.gradle`。
-
----
-
-## 四、安装
+## 二、安装
 
 1. 服务端：把与所用加载器对应的 jar 放入服务端 `mods/`；
 2. 客户端：**每个玩家客户端**的 `mods/` 也需放入同一 jar（用于自动应答握手）；
@@ -90,9 +45,9 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 五、配置文件
+## 三、配置文件
 
-路径：`<服务器目录>/config/mod_access_control.json`（三个加载器完全一致）。
+路径：`<服务器目录>/config/mod_access_control.json`（所有加载器完全一致）。
 
 默认值（首次启动自动生成）：
 
@@ -104,21 +59,40 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `requireClientMod` | `true` | 客户端必须安装本模组；未安装者加入时被拦截 |
 | `strictLoader` | `true` | 客户端加载器标识必须与服务端一致 |
 | `handshakeTimeoutSeconds` | `10` | 每个握手阶段的超时秒数 |
+| `language` | `"auto"` | 服务端文案语言（v1.1）：`auto` / `zh_cn` / `en_us`；`auto` 跟随服务器系统语言 |
 | `requiredCheckMode` | `"presence"` | 必需 Mod 校验模式：`presence` / `version_range` / `strict` |
 | `requiredMods[]` | `[]` | 必需 Mod 清单（`id` + 可选 `bounds[]` 操作符约束，或旧版 `minVersion`/`maxVersion`/`exactVersion`） |
 | `policy.mode` | `"blacklist"` | 策略：`whitelist` / `blacklist` / `switch` |
 | `policy.activeMode` | `"whitelist"` | `switch` 模式下当前生效的策略 |
 | `policy.recheckIntervalSeconds` | `60` | 定期复检间隔（秒），`0` = 不复检 |
-| `policy.whitelist[]` | `[]` | 白名单（mod id） |
-| `policy.blacklist[]` | `[]` | 黑名单（mod id） |
+| `policy.whitelist[]` | `[]` | 白名单（v1.1：字符串或 `{id, bounds}` 对象，见下文） |
+| `policy.blacklist[]` | `[]` | 黑名单（同上） |
 | `ignoredModIds[]` | `[]` | 额外忽略的 mod id（不参与任何校验） |
 | `logViolations` | `true` | 违规事件是否写入服务端日志 |
 | `exemptPlayers[]` | `[]` | 豁免玩家：玩家名（忽略大小写）或 `uuid:` 前缀的 UUID |
 | `exemptOps` | `false` | 是否默认豁免服务端 OP（不参与任何校验） |
 | `dryRun` | `false` | 试运行：违规只记录 / 通知，不实际踢出（验证规则用） |
 | `allowedMacVersions[]` | `[]` | 允许接入的本模组（Mod Access Control）版本列表，精确匹配客户端 macVersion；空 = 放行任意版本 |
+| `kickShowDetails` | `true` | 踢出消息是否逐条列出违规明细（v1.1；旧配置缺字段按开启处理） |
+| `adminShowDetails` | `true` | 管理员广播是否展示逐条违规明细（v1.1；关闭时只报类型与条数） |
 | `kickFooterEnabled` | `true` | 踢出消息底部“提示区”是否显示 |
 | `kickFooterLines[]` | `[]` | 底部提示区之后追加的自定义行 |
+
+### 黑白名单条目（v1.1）
+
+条目支持两种写法，**旧配置（纯字符串）无需修改即可继续使用**：
+
+```json
+"whitelist": [
+  "jei",                                            // 纯字符串：匹配该 id 的任意版本
+  { "id": "sodium", "bounds": [ { "op": ">=", "version": "0.5.0" } ] },
+  { "id": "optifine*", "bounds": [ { "op": "=", "version": "1.20.1" } ] }
+]
+```
+
+- `id` 支持 `*` 通配符（如 `sodium*` 匹配所有以 sodium 开头的 id）；
+- 未设置 `bounds` = 匹配**全部版本**；设置了则版本也须满足；
+- 黑名单同理（`"blacklist": [{ "id": "hacked*", "bounds": [...] }]`）。
 
 **必需 Mod 约束写法**（`version_range` 模式生效；`strict` 模式下上述规则 + 加载器一致性都须满足）：
 
@@ -133,31 +107,31 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 操作符支持：`=`（等于）、`!=`（不等于）、`>` / `>=`、`<` / `<=`；多条 `bounds` 之间为
 “且”关系。旧版字段 `minVersion` / `maxVersion` / `exactVersion` 仍受支持并自动按
-`[min,max]` / `exact` 语义参与校验（`required add` 已改用手写操作符 `>=1.0.0`、
-`1.0.0~2.0.0`、`--min 1.0.0` 等语法写入 `bounds`）。
+`[min,max]` / `exact` 语义参与校验。
 
 完整示例见 [config-example/mod_access_control.json](config-example/mod_access_control.json)。
 
 ---
 
-## 六、策略模式
+## 四、策略模式
 
 | 模式 | 行为 |
 | --- | --- |
-| `whitelist` | 客户端只能安装白名单内 Mod；白名单之外一律拒绝 |
-| `blacklist` | 客户端可装任意 Mod；检测到黑名单内 Mod 即拒绝 |
+| `whitelist` | 客户端只能安装白名单内 Mod（含版本约束）；白名单之外一律拒绝 |
+| `blacklist` | 客户端可装任意 Mod；检测到黑名单内 Mod（或命中版本约束）即拒绝 |
 | `switch` | 加入时完整检查；运行时可在黑白名单间切换（`activeMode`），并按 `recheckIntervalSeconds` 对已通过玩家定期复检 |
 
 > 忽略机制：本模组自身、`minecraft`、当前加载器及其基础设施（如 `forge`/`fabricloader`/
 > `fabric-api`/`neoforge` 等）恒不参与白名单 / 黑名单 / 必需校验，避免误伤。
-> 注意：黑白名单校验的是**游戏内容 Mod 的 id**，并非文件层面的完整性防作弊手段。
+> 注意：黑白名单校验的是**游戏内容 Mod 的 id 与版本**，并非文件层面的完整性防作弊手段。
 
 ---
 
-## 七、命令 `/mac`（权限等级 2）
+## 五、命令 `/mac`（权限等级 2）
 
 | 命令 | 作用 |
 | --- | --- |
+| `/mac help [页码]` | 分页帮助（v1.1；`/mac help 2` 查看下一页） |
 | `/mac` 或 `/mac status` | 查看当前策略、清单数量、豁免 / 试运行状态、在线会话统计 |
 | `/mac recent` | 最近违规记录（最新在前，最多 20 条展示） |
 | `/mac check <玩家>` | 查看指定玩家会话状态（玩家参数可 Tab 补全） |
@@ -175,17 +149,45 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac required list` | 列出必需 Mod |
 | `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
 | `/mac required remove <id>` | 移除必需 Mod（Tab 可补全） |
-| `/mac whitelist list\|add <id>\|remove <id>` | 管理白名单（移除项 Tab 可补全） |
-| `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单（移除项 Tab 可补全） |
+| `/mac whitelist list\|add <id> [版本约束]\|remove <id>` | 管理白名单（v1.1：add 可附版本约束，如 `add sodium >=1.0`） |
+| `/mac blacklist list\|add <id> [版本约束]\|remove <id>` | 管理黑名单（同上） |
 
 > 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
 > `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
-
-所有修改会即时写盘并影响下一名玩家 / 下一次复检。
+> 所有修改会即时写盘并影响下一名玩家 / 下一次复检。
 
 ---
 
-## 八、两阶段握手流程（三加载器一致）
+## 六、多语言（v1.1）
+
+- **服务端文案**（命令回显 / 日志 / 管理广播）：由配置 `language` 决定，
+  `auto` 跟随服务器操作系统语言；内置 `zh_cn` 与 `en_us` 两套文案。
+- **玩家踢出消息**：由服务端按**玩家的客户端语言**渲染为纯文本后下发，
+  因此客户端界面与服务端日志 / 控制台显示完全一致；无法获取客户端语言时
+  回退到服务端语言（`language` 配置）。
+
+---
+
+## 七、作为其他 Mod 的前置（公共 API，v1.1）
+
+其他 Mod 可把本模组声明为前置（Forge/NeoForge 在 `mods.toml` 加依赖项，Fabric 在
+`fabric.mod.json` 的 `depends` 中加入 `"mod_access_control": "*"`），然后调用静态门面
+`mcyszl.top.mod_access_control.api.MacApi`：
+
+| 方法 | 作用 |
+| --- | --- |
+| `MacApi.available()` | 核心是否已就绪 |
+| `MacApi.isVerified(uuidOrName)` | 玩家当前会话是否已通过全部准入校验 |
+| `MacApi.getSessionMods(uuidOrName)` | 读取该玩家在线会话的完整 Mod 清单（id → 版本） |
+| `MacApi.isExempt(uuid, name, op)` / `addExempt` / `removeExempt` | 查询 / 增删豁免条目 |
+| `MacApi.addViolationListener(listener)` | 订阅违规事件（含试运行中“未实际踢出”的违规） |
+| `MacApi.modVersion()` / `protocolVersion()` / `loaderType()` | 版本与加载器信息 |
+
+所有方法在核心未就绪时安全返回默认值，不会抛异常。
+
+---
+
+## 八、两阶段握手流程（各加载器一致）
 
 ```
 玩家加入
@@ -217,8 +219,9 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ## 九、玩家反馈与管理端提示
 
-- **被拒玩家**：断开原因组件由服务端直接构造纯文本（无翻译键依赖），逐条列出
-  “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”；下方附加底部提示区（默认提示 +
+- **被拒玩家**：断开原因随客户端语言显示（详见“多语言”），逐条列出
+  “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”；`kickShowDetails=false`
+  时隐藏逐条明细只保留标题与提示区。下方附加底部提示区（默认提示 +
   配置的自定义行，`kickFooterEnabled` 可整体关闭）。
 - **豁免者**：不发送任何网络消息、不建立会话、不参与校验，直接放行。
 - **试运行（dryRun）**：所有本应踢出的违规划转为“记录违规 + 通知管理员（标注未实际踢出）”，
@@ -227,7 +230,8 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
   `config/mod_access_control_history.jsonl`（最长保留 2 万条 / 8MB），可用 `/mac audit` 审计，
   或 `/mac learn` 一键把它写入白名单 / 黑名单。
 - **管理员**：每次拦截通过聊天 + ActionBar + 铁砧音效广播（`[MAC] 违规拦截: 玩家 -> 原因`），
-  无在线管理员时降级为服务端日志；历史记录可用 `/mac recent` 查看。
+  无在线管理员时降级为服务端日志；`adminShowDetails=false` 时只报违规类型与条数；
+  历史记录可用 `/mac recent` 查看。
 
 ---
 

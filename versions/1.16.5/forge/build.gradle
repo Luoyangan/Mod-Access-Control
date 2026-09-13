@@ -62,10 +62,14 @@ sourceSets {
         java {
             srcDir '../../../common/src/main/java'
         }
+        resources {
+            srcDir '../../../common/src/main/resources'
+        }
     }
 }
 
 processResources {
+    filteringCharset = 'UTF-8'
     def replaceProperties = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,

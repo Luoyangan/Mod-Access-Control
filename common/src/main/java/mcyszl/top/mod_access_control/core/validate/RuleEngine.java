@@ -4,10 +4,10 @@
 package mcyszl.top.mod_access_control.core.validate;
 
 import mcyszl.top.mod_access_control.core.model.CheckMode;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
 import mcyszl.top.mod_access_control.core.model.RequiredModRule;
 import mcyszl.top.mod_access_control.core.network.MacPackets.ClientMod;
-import mcyszl.top.mod_access_control.core.version.SemVer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,7 +21,8 @@ import java.util.Set;
  * <p>负责：
  * <ul>
  *   <li>必需 Mod 存在性 / 版本范围 / 严格匹配（三种 {@link CheckMode}）；</li>
- *   <li>白名单 / 黑名单（含 SWITCH 下当前生效的策略）；</li>
+ *   <li>白名单 / 黑名单（条目支持 {@code *} 通配符与可选版本约束，
+ *       无约束 = 全部版本；含 SWITCH 下当前生效的策略）；</li>
  *   <li>加载器兼容性（STRICT / 严格场景）。</li>
  * </ul>
  */
@@ -57,8 +58,8 @@ public final class RuleEngine {
             if (mode == CheckMode.PRESENCE) {
                 continue;
             }
-            // VERSION_RANGE / STRICT：校验版本约束。
-            if (!versionAllowed(rule, actual)) {
+            // VERSION_RANGE / STRICT：校验版本约束（无约束 = 任意版本通过）。
+            if (!RequiredModRule.matchesBounds(rule.effectiveBounds(), actual)) {
                 problems.add(new Problem(ProblemType.VERSION_MISMATCH,
                         rule.getId(), rule.constraintText(), actual));
             }
@@ -69,12 +70,15 @@ public final class RuleEngine {
     /**
      * 校验客户端完整 Mod 列表是否命中白名单 / 黑名单。
      *
+     * <p>条目匹配语义：id 命中（通配符/忽略大小写）且版本满足条目约束
+     * （无约束 = 全部版本）才视作命中名单。</p>
+     *
      * @param activePolicy 当前生效策略（SWITCH 时已由调用方解析为实际策略）
      */
     public static List<Problem> checkPolicy(List<ClientMod> clientMods,
                                             PolicyMode activePolicy,
-                                            List<String> whitelist,
-                                            List<String> blacklist,
+                                            List<PolicyEntry> whitelist,
+                                            List<PolicyEntry> blacklist,
                                             Set<String> ignoredIds) {
         List<Problem> problems = new ArrayList<>();
         if (clientMods == null || activePolicy == null || activePolicy == PolicyMode.SWITCH) {
@@ -85,12 +89,26 @@ public final class RuleEngine {
             if (mod.id == null || ignore.contains(mod.id)) {
                 continue;
             }
-            if (activePolicy == PolicyMode.WHITELIST
-                    && (whitelist == null || !whitelist.contains(mod.id))) {
-                problems.add(new Problem(ProblemType.NOT_WHITELISTED, mod.id, null, mod.version));
-            } else if (activePolicy == PolicyMode.BLACKLIST
-                    && blacklist != null && blacklist.contains(mod.id)) {
-                problems.add(new Problem(ProblemType.BLACKLISTED, mod.id, null, mod.version));
+            if (activePolicy == PolicyMode.WHITELIST) {
+                PolicyEntry hit = firstHit(whitelist, mod);
+                if (hit == null) {
+                    // id 不在名单内，或 id 在但版本不满足条目约束。
+                    boolean idListed = anyIdMatch(whitelist, mod.id);
+                    problems.add(new Problem(
+                            idListed ? ProblemType.NOT_WHITELISTED_VERSION : ProblemType.NOT_WHITELISTED,
+                            mod.id,
+                            idListed ? constraintSummary(whitelist, mod.id) : null,
+                            mod.version));
+                }
+            } else if (activePolicy == PolicyMode.BLACKLIST) {
+                PolicyEntry hit = firstHit(blacklist, mod);
+                if (hit != null) {
+                    // 命中且带版本约束 → 版本型黑名单违规；否则普通黑名单违规。
+                    ProblemType type = hit.hasBounds()
+                            ? ProblemType.BLACKLISTED_VERSION : ProblemType.BLACKLISTED;
+                    problems.add(new Problem(type, mod.id,
+                            hit.hasBounds() ? hit.constraintText() : null, mod.version));
+                }
             }
         }
         return problems;
@@ -110,52 +128,50 @@ public final class RuleEngine {
         return problems;
     }
 
-    private static boolean versionAllowed(RequiredModRule rule, String actualVersion) {
-        SemVer actual = SemVer.parse(actualVersion);
-        List<RequiredModRule.Bound> bounds = rule.effectiveBounds();
-        if (bounds.isEmpty()) {
-            // 无版本约束：存在即可（缺失已在调用方处理）。
-            return true;
-        }
-        for (RequiredModRule.Bound b : bounds) {
-            if (!matchBound(b, actual)) {
-                return false;
-            }
-        }
-        return true;
+    /** 白名单判定：任一条目完整命中（id + 版本约束）即在名单内。 */
+    private static boolean entryHit(List<PolicyEntry> entries, ClientMod mod) {
+        return firstHit(entries, mod) != null;
     }
 
-    /** 用一条操作符约束比对客户端实际版本。 */
-    private static boolean matchBound(RequiredModRule.Bound bound, SemVer actual) {
-        SemVer want = SemVer.parse(bound.getVersion());
-        if (want == null) {
-            // 规则里配置的版本无法解析：当作无约束，避免误伤。
-            return true;
+    /** 是否存在 id 命中（不考虑版本）的条目。 */
+    private static boolean anyIdMatch(List<PolicyEntry> entries, String modId) {
+        if (entries == null) {
+            return false;
         }
-        if (actual == null) {
-            // 客户端版本无法解析：仅 “!=” 可视为“确非该版本”成立。
-            return "!=".equals(bound.getOp());
+        for (PolicyEntry e : entries) {
+            if (e != null && e.matchesId(modId)) {
+                return true;
+            }
         }
-        int c = actual.compareTo(want);
-        String op = bound.getOp();
-        if ("=".equals(op)) {
-            return c == 0;
+        return false;
+    }
+
+    /** 汇总所有 id 命中条目的约束描述（“ 或 ”连接；无约束条目返回 *）。 */
+    private static String constraintSummary(List<PolicyEntry> entries, String modId) {
+        StringBuilder sb = new StringBuilder();
+        if (entries != null) {
+            for (PolicyEntry e : entries) {
+                if (e != null && e.matchesId(modId)) {
+                    if (sb.length() > 0) {
+                        sb.append(" 或 ");
+                    }
+                    sb.append(e.constraintText());
+                }
+            }
         }
-        if ("!=".equals(op)) {
-            return c != 0;
+        return sb.length() == 0 ? "*" : sb.toString();
+    }
+
+    /** 返回第一个完整命中（id 命中且版本满足约束）的条目；无则 null。 */
+    private static PolicyEntry firstHit(List<PolicyEntry> entries, ClientMod mod) {
+        if (entries == null || entries.isEmpty()) {
+            return null;
         }
-        if (">".equals(op)) {
-            return c > 0;
+        for (PolicyEntry e : entries) {
+            if (e != null && e.matchesId(mod.id) && e.matchesVersion(mod.version)) {
+                return e;
+            }
         }
-        if (">=".equals(op)) {
-            return c >= 0;
-        }
-        if ("<".equals(op)) {
-            return c < 0;
-        }
-        if ("<=".equals(op)) {
-            return c <= 0;
-        }
-        return true;
+        return null;
     }
 }

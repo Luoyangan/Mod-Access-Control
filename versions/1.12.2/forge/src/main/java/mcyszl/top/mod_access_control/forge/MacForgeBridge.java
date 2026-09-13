@@ -13,6 +13,7 @@ import net.minecraftforge.common.ForgeVersion;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.ModContainer;
+import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 
 import java.nio.file.Path;
 import java.util.UUID;
@@ -76,6 +77,23 @@ public final class MacForgeBridge implements PlatformBridge {
         EntityPlayerMP p = player(playerUuid);
         if (p != null) {
             Feedback.kick(p, message);
+        }
+    }
+
+    @Override
+    public String clientLanguage(String playerUuid) {
+        EntityPlayerMP p = player(playerUuid);
+        if (p == null) {
+            return null;
+        }
+        // 1.12.2 的 EntityPlayerMP#language 是私有字段且没有公开 getter，
+        // 只能经 ObfuscationReflectionHelper 读取（运行时为 srg 名 field_71148_cg）。
+        try {
+            Object value = ObfuscationReflectionHelper.getPrivateValue(
+                    EntityPlayerMP.class, p, "field_71148_cg");
+            return value == null ? null : String.valueOf(value);
+        } catch (Throwable t) {
+            return null;
         }
     }
 

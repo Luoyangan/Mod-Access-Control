@@ -127,3 +127,6 @@ run-*/
 
 # 编译输出目录（IntelliJ / Eclipse 产物）
 **/bin/
+
+# 内部开发文档（构建/目录结构等，不对外公开）
+/docs/internal/

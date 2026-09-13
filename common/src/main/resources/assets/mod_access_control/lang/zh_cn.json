@@ -1,0 +1,19 @@
+{
+  "mac.kick.header.no_client_mod": "连接被拒绝：客户端未安装「Mod Access Control / 模组准入控制」。\n本服务器要求所有客户端安装该模组以完成准入校验。",
+  "mac.kick.header.protocol": "准入协议版本不兼容（服务器=%s，客户端=%s）。\n请从服务器指定的渠道更新模组后再加入。",
+  "mac.kick.header.loader": "加载器不兼容：服务器要求 %s，你的客户端为 %s。\n请使用与服务器一致的 Mod 加载器。",
+  "mac.kick.header.timeout": "准入校验超时。若你已安装本模组，请重启游戏后重试；若仍未解决，请联系服务器管理员。",
+  "mac.kick.header.violation": "准入校验未通过，客户端 Mod 列表存在以下问题：",
+  "mac.kick.header.mac_version": "连接被拒绝：本模组版本不在服务器允许列表内。\n服务器要求的版本: %s；你的版本: %s。",
+  "mac.kick.hint.generic": "提示：请按服务器要求安装正确的模组版本后重新加入。",
+  "mac.kick.hint.timeout": "提示：如多次失败，请尝试更新游戏/模组版本后重连。",
+  "mac.kick.hint.violation": "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。",
+  "mac.kick.hint.mac_version": "提示：请把 Mod Access Control 更新/切换到服务器要求的版本后重新加入。",
+  "mac.line.missing_required": "缺少必需 Mod: %s（要求 %s）",
+  "mac.line.version_mismatch": "Mod 版本不符: %s（要求 %s，你的是 %s）",
+  "mac.line.not_whitelisted": "安装了白名单之外的 Mod: %s（版本 %s）",
+  "mac.line.not_whitelisted_version": "Mod 版本不符: %s（允许 %s，你的是 %s）",
+  "mac.line.blacklisted": "安装了被禁止的 Mod: %s（版本 %s）",
+  "mac.line.blacklisted_version": "被禁止的 Mod 版本: %s（禁止 %s，你的是 %s）",
+  "mac.line.loader": "加载器不兼容（期望 %s，实际 %s）"
+}

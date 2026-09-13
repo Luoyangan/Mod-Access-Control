@@ -3,6 +3,7 @@
 
 package mcyszl.top.mod_access_control.forge;
 
+import mcyszl.top.mod_access_control.api.MacApi;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.forge.command.MacCommand;
 import mcyszl.top.mod_access_control.forge.net.ForgeNet;
@@ -35,6 +36,8 @@ public final class ForgeMacMod {
         Mac.setLogger(new ForgeLog(event.getModLog()));
         Holder.init();
         ForgeNet.init();
+        // 公共 API 门面：供以本模组为前置的其他 mod 调用
+        MacApi.install(new MacApiImpl(Holder.service()));
 
         // 游戏内事件（玩家加入离开 / 刻驱动 / 命令注册）
         MinecraftForge.EVENT_BUS.register(ForgeEvents.class);

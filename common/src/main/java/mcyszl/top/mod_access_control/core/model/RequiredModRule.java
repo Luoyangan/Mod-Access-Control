@@ -3,6 +3,8 @@
 
 package mcyszl.top.mod_access_control.core.model;
 
+import mcyszl.top.mod_access_control.core.version.SemVer;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -209,6 +211,57 @@ public class RequiredModRule {
         }
         String t = s.trim();
         return t.isEmpty() || "*".equals(t) ? null : t;
+    }
+
+    /**
+     * 静态版本比对：实际版本是否满足全部约束（无约束 = 全部版本通过）。
+     * 供必需 Mod 与黑白名单条目共用（版本约束语义一致：无约束 = 任意版本）。
+     */
+    public static boolean matchesBounds(List<Bound> bounds, String actualVersion) {
+        if (bounds == null || bounds.isEmpty()) {
+            return true;
+        }
+        SemVer actual = SemVer.parse(actualVersion);
+        for (Bound b : bounds) {
+            if (!matchBound(b, actual)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 用一条操作符约束比对客户端实际版本。 */
+    static boolean matchBound(Bound bound, SemVer actual) {
+        SemVer want = SemVer.parse(bound.getVersion());
+        if (want == null) {
+            // 规则里配置的版本无法解析：当作无约束，避免误伤。
+            return true;
+        }
+        if (actual == null) {
+            // 客户端版本无法解析：仅 “!=” 可视为“确非该版本”成立。
+            return "!=".equals(bound.getOp());
+        }
+        int c = actual.compareTo(want);
+        String op = bound.getOp();
+        if ("=".equals(op)) {
+            return c == 0;
+        }
+        if ("!=".equals(op)) {
+            return c != 0;
+        }
+        if (">".equals(op)) {
+            return c > 0;
+        }
+        if (">=".equals(op)) {
+            return c >= 0;
+        }
+        if ("<".equals(op)) {
+            return c < 0;
+        }
+        if ("<=".equals(op)) {
+            return c <= 0;
+        }
+        return true;
     }
 
     @Override

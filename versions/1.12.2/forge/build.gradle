@@ -34,10 +34,14 @@ sourceSets {
         java {
             srcDir '../../../common/src/main/java'
         }
+        resources {
+            srcDir '../../../common/src/main/resources'
+        }
     }
 }
 
 processResources {
+    filteringCharset = 'UTF-8'
     inputs.property 'version', project.version
     inputs.property 'mcversion', project.minecraft.version
     filesMatching('mcmod.info') {

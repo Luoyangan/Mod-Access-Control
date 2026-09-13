@@ -75,6 +75,12 @@ public final class MacForgeBridge implements PlatformBridge {
     }
 
     @Override
+    public String clientLanguage(String playerUuid) {
+        ServerPlayerEntity p = player(playerUuid);
+        return p == null ? null : p.getLanguage();
+    }
+
+    @Override
     public void notifyOps(String text) {
         ForgeEvents.alertOps(text);
     }

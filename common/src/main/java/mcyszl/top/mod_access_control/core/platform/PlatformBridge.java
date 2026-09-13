@@ -36,6 +36,16 @@ public interface PlatformBridge {
     /** 断开指定玩家（发送理由消息）。若玩家不在线则忽略。 */
     void disconnectPlayer(String playerUuid, KickMessage message);
 
+    /**
+     * 指定玩家客户端的语言代码（如 {@code zh_cn} / {@code en_us}）。
+     *
+     * <p>核心用它把玩家可见的踢出消息与踢出底部提示渲染成
+     * 玩家自己的语言；无法获取时返回 null（回退服务端语言）。</p>
+     */
+    default String clientLanguage(String playerUuid) {
+        return null;
+    }
+
     /** 向在线管理员广播一条纯文本提示（聊天 + 日志）。 */
     default void notifyOps(String text) {
     }

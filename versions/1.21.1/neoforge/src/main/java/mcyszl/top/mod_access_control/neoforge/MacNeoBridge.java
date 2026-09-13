@@ -75,6 +75,12 @@ public final class MacNeoBridge implements PlatformBridge {
     }
 
     @Override
+    public String clientLanguage(String playerUuid) {
+        ServerPlayer p = player(playerUuid);
+        return p == null ? null : p.getLanguage();
+    }
+
+    @Override
     public void notifyOps(String text) {
         NeoEvents.alertOps(text);
     }

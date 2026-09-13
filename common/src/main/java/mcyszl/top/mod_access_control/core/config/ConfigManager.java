@@ -10,7 +10,6 @@ import com.google.gson.JsonSyntaxException;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 import mcyszl.top.mod_access_control.core.network.Json;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -40,7 +39,7 @@ public final class ConfigManager {
         }
         try {
             String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
-            MacConfig parsed = Json.gson().fromJson(text, MacConfig.class);
+            MacConfig parsed = configGson().fromJson(text, MacConfig.class);
             if (parsed == null) {
                 throw new JsonSyntaxException("empty config");
             }
@@ -73,11 +72,23 @@ public final class ConfigManager {
     public synchronized void save() {
         try {
             Files.createDirectories(file.getParent());
-            Gson pretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-            Files.write(file, pretty.toJson(current).getBytes(StandardCharsets.UTF_8));
+            Files.write(file, configGson().toJson(current).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             Mac.logger().warn("[MAC] 配置保存失败: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 配置专用 Gson：注册黑白名单条目适配器（兼容 v1.0 纯字符串与
+     * v1.1 对象条目两种形态；写出时无版本约束保持纯字符串）。
+     */
+    private static Gson configGson() {
+        return new GsonBuilder()
+                .setPrettyPrinting()
+                .disableHtmlEscaping()
+                .registerTypeAdapter(mcyszl.top.mod_access_control.core.model.PolicyEntry.class,
+                        new PolicyEntryTypeAdapter())
+                .create();
     }
 
     public MacConfig current() {

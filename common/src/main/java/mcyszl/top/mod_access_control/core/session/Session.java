@@ -36,6 +36,8 @@ public final class Session {
     private String loaderType;
     private String loaderVersion;
     private String macVersion;
+    /** 登录阶段客户端上报的界面语言（旧版客户端可能不报，为 null）。 */
+    private String clientLanguage;
     /** 登录阶段客户端上报：必需 mod id -> 版本。 */
     private final Map<String, String> requiredReport = new LinkedHashMap<>();
     /** 进入游戏阶段客户端上报的完整列表。 */
@@ -101,6 +103,14 @@ public final class Session {
 
     public void macVersion(String macVersion) {
         this.macVersion = macVersion;
+    }
+
+    public String clientLanguage() {
+        return clientLanguage;
+    }
+
+    public void clientLanguage(String clientLanguage) {
+        this.clientLanguage = clientLanguage;
     }
 
     public Map<String, String> requiredReport() {

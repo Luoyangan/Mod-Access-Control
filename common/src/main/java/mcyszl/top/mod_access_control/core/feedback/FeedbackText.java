@@ -3,6 +3,7 @@
 
 package mcyszl.top.mod_access_control.core.feedback;
 
+import mcyszl.top.mod_access_control.core.i18n.I18n;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 
 import java.util.ArrayList;
@@ -25,36 +26,51 @@ public final class FeedbackText {
     /**
      * 根据原因生成默认提示行；无对应提示返回 {@code null}。
      * 注意：仅负责“提示区”，标题与逐条原因仍由适配层渲染。
+     * 文案随当前服务端语言（默认场景；玩家可见场景请用带客户端语言的重载）。
      */
     public static String hintFor(DisconnectReason reason) {
+        return I18n.trTo(null, hintKeyFor(reason));
+    }
+
+    /** 按断开原因取底部提示区的翻译键。 */
+    public static String hintKeyFor(DisconnectReason reason) {
         switch (reason) {
+            case HANDSHAKE_TIMEOUT:
+                return "mac.kick.hint.timeout";
+            case POLICY_VIOLATION:
+                return "mac.kick.hint.violation";
+            case MAC_VERSION_NOT_ALLOWED:
+                return "mac.kick.hint.mac_version";
             case NO_CLIENT_MOD:
             case PROTOCOL_MISMATCH:
             case LOADER_MISMATCH:
-                return "提示：请按服务器要求安装正确的模组版本后重新加入。";
-            case HANDSHAKE_TIMEOUT:
-                return "提示：如多次失败，请尝试更新游戏/模组版本后重连。";
-            case POLICY_VIOLATION:
-                return "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。";
-            case MAC_VERSION_NOT_ALLOWED:
             default:
-                return "提示：请把 Mod Access Control 更新/切换到服务器要求的版本后重新加入。";
+                return "mac.kick.hint.generic";
         }
     }
 
     /**
      * 汇总底部提示区逐行文案：默认提示行（若存在）+ 配置的自定义行。
      * 关闭 {@code kickFooterEnabled} 时返回空列表（整体隐藏）。
+     *
+     * <p>默认提示行按服务端语言生成（日志 / 未知客户端语言场景）。</p>
      */
     public static List<String> footer(DisconnectReason reason, MacConfig cfg) {
+        return footer(reason, cfg, null);
+    }
+
+    /**
+     * 汇总底部提示区逐行文案（默认提示行随被踢玩家的客户端语言）。
+     *
+     * @param clientLanguage 被踢玩家的客户端语言（如 {@code zh_cn}）；
+     *                       无法识别时回退服务端语言
+     */
+    public static List<String> footer(DisconnectReason reason, MacConfig cfg, String clientLanguage) {
         if (cfg == null || !cfg.isKickFooterEnabled()) {
             return Collections.emptyList();
         }
         List<String> out = new ArrayList<>();
-        String hint = hintFor(reason);
-        if (hint != null) {
-            out.add(hint);
-        }
+        out.add(I18n.trTo(clientLanguage, hintKeyFor(reason)));
         if (cfg.getKickFooterLines() != null) {
             for (String line : cfg.getKickFooterLines()) {
                 if (line != null && !line.trim().isEmpty()) {
