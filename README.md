@@ -171,7 +171,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac dryrun <true/false>` | 试运行开关（违规不实际踢出） |
 | `/mac mode <whitelist/blacklist/switch>` | 设置策略模式（Tab 可补全） |
 | `/mac active <whitelist/blacklist>` | 设置 switch 模式下生效的策略（Tab 可补全） |
-| `/mac exempt list\|add <玩家\|@ops>\|remove <玩家>` | 管理豁免名单（`add @ops` 一键写入所有在线 OP；移除项 Tab 可补全） |
+| `/mac exempt list\|add <玩家>\|remove <玩家>` | 管理豁免名单（移除项 Tab 可补全） |
 | `/mac allowedmac list\|add <版本>\|remove <版本>` | 管理允许接入的本模组版本（空 = 放行任意；`add *` 清空限制） |
 | `/mac required list` | 列出必需 Mod |
 | `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
@@ -180,7 +180,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单（移除项 Tab 可补全） |
 
 > 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
-> `check/audit/learn/exempt add` 的玩家参数均提供在线候选（`exempt add` 额外支持 `@ops`），降低误输。
+> `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
 
 所有修改会即时写盘并影响下一名玩家 / 下一次复检。
 

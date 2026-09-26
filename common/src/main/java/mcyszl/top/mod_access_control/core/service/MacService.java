@@ -573,34 +573,6 @@ public final class MacService {
         return sb.toString();
     }
 
-    /**
-     * 把一组玩家名批量加入豁免名单（大小写不敏感去重）。返回命令回显文本。
-     */
-    public String exemptAddAll(List<String> names) {
-        List<String> target = configManager.current().getExemptPlayers();
-        List<String> added = new ArrayList<>();
-        int dup = 0;
-        for (String n : names) {
-            if (n == null || n.trim().isEmpty()) {
-                continue;
-            }
-            String name = n.trim();
-            if (target.stream().anyMatch(i -> i.equalsIgnoreCase(name))) {
-                dup++;
-                continue;
-            }
-            target.add(name);
-            added.add(name);
-        }
-        configManager().save();
-        StringBuilder sb = new StringBuilder("已批量加入豁免名单：新增 ").append(added.size())
-                .append("，已存在 ").append(dup);
-        if (!added.isEmpty()) {
-            sb.append("：").append(String.join(", ", added));
-        }
-        return sb.toString();
-    }
-
     // ------------------------------------------------------------------ 内部实现
 
     /** 为断开消息附加配置的“底部提示区”文案。 */

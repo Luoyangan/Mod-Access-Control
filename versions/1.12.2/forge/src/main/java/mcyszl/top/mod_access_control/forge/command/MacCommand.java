@@ -13,7 +13,6 @@ import mcyszl.top.mod_access_control.forge.Holder;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.Style;
@@ -34,7 +33,7 @@ import java.util.List;
  * audit &lt;玩家&gt; / learn &lt;玩家&gt; &lt;whitelist|blacklist|required&gt; / reload / save /
  * recheck / enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove（add 支持 @ops 批量写入在线 OP）/ allowedmac list|add|remove /
+ * exempt list|add|remove / allowedmac list|add|remove /
  * required list|add|remove / whitelist list|add|remove /
  * blacklist list|add|remove。</p>
  */
@@ -68,7 +67,7 @@ public final class MacCommand extends CommandBase {
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
         try {
-            dispatch(server, sender, args);
+            dispatch(sender, args);
         } catch (MacCmdException ex) {
             send(sender, ex.getMessage(), TextFormatting.RED);
         } catch (Exception ex) {
@@ -76,7 +75,7 @@ public final class MacCommand extends CommandBase {
         }
     }
 
-    private void dispatch(MinecraftServer server, ICommandSender sender, String[] args) {
+    private void dispatch(ICommandSender sender, String[] args) {
         String sub = args.length == 0 ? "status" : args[0].toLowerCase();
         if (sub.equals("help")) {
             sendHelp(sender, args);
@@ -189,17 +188,6 @@ public final class MacCommand extends CommandBase {
             return;
         }
         if (sub.equals("exempt")) {
-            if (args.length >= 3 && "add".equalsIgnoreCase(args[1])
-                    && "@ops".equalsIgnoreCase(args[2])) {
-                List<String> ops = new ArrayList<>();
-                for (EntityPlayerMP p : server.getPlayerList().getPlayers()) {
-                    if (server.getPlayerList().canSendCommands(p.getGameProfile())) {
-                        ops.add(p.getGameProfile().getName());
-                    }
-                }
-                send(sender, service().exemptAddAll(ops), TextFormatting.GREEN);
-                return;
-            }
             listOp(sender, args, "豁免名单", new ListOp() {
                 @Override
                 public List<String> list() {
@@ -341,7 +329,7 @@ public final class MacCommand extends CommandBase {
             "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
             "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
             "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
-            "/mac exempt list|add|remove <玩家|@ops> - 管理豁免名单（@ops 批量写入所有在线 OP）",
+            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
             "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
             "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
             "/mac whitelist list|add|remove <id> - 管理白名单",
@@ -497,12 +485,7 @@ public final class MacCommand extends CommandBase {
                 return getListOfStringsMatchingLastWord(args, LEARN_MODES);
             }
             if (sub.equals("exempt") && "add".equalsIgnoreCase(args[1])) {
-                List<String> opts = new ArrayList<>();
-                opts.add("@ops");
-                for (String n : playerNames(server, args)) {
-                    opts.add(n);
-                }
-                return getListOfStringsMatchingLastWord(args, opts);
+                return playerNames(server, args);
             }
             if (sub.equals("exempt") && "remove".equalsIgnoreCase(args[1])) {
                 return getListOfStringsMatchingLastWord(args, cfg().getExemptPlayers());
