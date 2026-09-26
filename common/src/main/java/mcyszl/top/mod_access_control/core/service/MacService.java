@@ -501,7 +501,6 @@ public final class MacService {
                 added.add(m.id);
             }
         }
-        configManager().save();
         StringBuilder sb = new StringBuilder();
         sb.append("已用玩家 ").append(nameOrUuid).append(" 的").append(sourceDesc)
                 .append("更新").append(targetName).append("：新增 ").append(added.size())
@@ -509,6 +508,95 @@ public final class MacService {
         if (!added.isEmpty()) {
             int n = Math.min(added.size(), 8);
             sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 把玩家最近一次 Mod 清单（在线会话优先，否则最近历史记录）一键写入
+     * 必需清单 requiredMods（跳过本模组与恒忽略项，按 id 去重）。返回命令回显文本。
+     */
+    public String learnRequired(String nameOrUuid) {
+        MacConfig cfg = configManager.current();
+        List<ClientMod> src;
+        String sourceDesc;
+        Session live = null;
+        for (Session s : sessions.values()) {
+            if (s.phase() == Phase.VERIFIED
+                    && (s.uuid().equalsIgnoreCase(nameOrUuid) || s.name().equalsIgnoreCase(nameOrUuid))) {
+                live = s;
+                break;
+            }
+        }
+        if (live != null) {
+            src = live.fullList();
+            sourceDesc = "在线完整清单";
+        } else {
+            ModRecord rec = history.latestFor(nameOrUuid);
+            if (rec == null) {
+                return "找不到玩家 " + nameOrUuid + " 的在线会话或历史 Mod 记录。";
+            }
+            src = rec.mods;
+            sourceDesc = "最近一次记录";
+        }
+        Set<String> ignore = ignoredIds(cfg);
+        List<RequiredModRule> target = cfg.getRequiredMods();
+        List<String> added = new ArrayList<>();
+        int dup = 0;
+        int skip = 0;
+        if (src != null) {
+            for (ClientMod m : src) {
+                if (m == null || m.id == null || m.id.equalsIgnoreCase(Mac.MOD_ID)) {
+                    continue;
+                }
+                if (ignore.contains(m.id)) {
+                    skip++;
+                    continue;
+                }
+                if (target.stream().anyMatch(r -> r.getId().equalsIgnoreCase(m.id))) {
+                    dup++;
+                    continue;
+                }
+                target.add(new RequiredModRule(m.id));
+                added.add(m.id);
+            }
+        }
+        configManager().save();
+        StringBuilder sb = new StringBuilder();
+        sb.append("已用玩家 ").append(nameOrUuid).append(" 的").append(sourceDesc)
+                .append("更新必需清单：新增 ").append(added.size())
+                .append("，已存在 ").append(dup).append("，跳过 ").append(skip);
+        if (!added.isEmpty()) {
+            int n = Math.min(added.size(), 8);
+            sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 把一组玩家名批量加入豁免名单（大小写不敏感去重）。返回命令回显文本。
+     */
+    public String exemptAddAll(List<String> names) {
+        List<String> target = configManager.current().getExemptPlayers();
+        List<String> added = new ArrayList<>();
+        int dup = 0;
+        for (String n : names) {
+            if (n == null || n.trim().isEmpty()) {
+                continue;
+            }
+            String name = n.trim();
+            if (target.stream().anyMatch(i -> i.equalsIgnoreCase(name))) {
+                dup++;
+                continue;
+            }
+            target.add(name);
+            added.add(name);
+        }
+        configManager().save();
+        StringBuilder sb = new StringBuilder("已批量加入豁免名单：新增 ").append(added.size())
+                .append("，已存在 ").append(dup);
+        if (!added.isEmpty()) {
+            sb.append("：").append(String.join(", ", added));
         }
         return sb.toString();
     }

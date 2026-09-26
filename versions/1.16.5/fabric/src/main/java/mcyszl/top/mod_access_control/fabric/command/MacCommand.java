@@ -24,6 +24,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -34,10 +35,10 @@ import java.util.stream.Collectors;
  * 管理员命令 /mac（权限等级 2）。
  *
  * <p>子命令：help [页码] / status / recent / check &lt;玩家&gt; / audit &lt;玩家&gt; /
- * learn &lt;玩家&gt; &lt;whitelist|blacklist&gt; / reload / save / recheck /
+ * learn &lt;玩家&gt; &lt;whitelist|blacklist|required&gt; / reload / save / recheck /
  * enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove / required list|add|remove /
+ * exempt list|add|remove（add 支持 @ops 批量写入在线 OP）/ required list|add|remove /
  * whitelist list|add|remove / blacklist list|add|remove / allowedmac list|add|remove。</p>
  *
  * <p>枚举参数（mode/active/learn）与列表移除、玩家名参数均带 Brigadier 自动补全。</p>
@@ -66,6 +67,23 @@ public final class MacCommand {
         for (ServerPlayer p : ctx.getSource().getServer().getPlayerList().getPlayers()) {
             b.suggest(p.getGameProfile().getName());
         }
+        return b.buildFuture();
+    };
+
+    /** 豁免名单候选：@ops（批量写入所有在线 OP）+ 在线玩家名。 */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_EXEMPT = (ctx, b) -> {
+        b.suggest("@ops");
+        for (ServerPlayer p : ctx.getSource().getServer().getPlayerList().getPlayers()) {
+            b.suggest(p.getGameProfile().getName());
+        }
+        return b.buildFuture();
+    };
+
+    /** learn 目标候选：白名单 / 黑名单 / 必需清单。 */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_LEARN = (ctx, b) -> {
+        b.suggest("whitelist");
+        b.suggest("blacklist");
+        b.suggest("required");
         return b.buildFuture();
     };
 
@@ -135,7 +153,7 @@ public final class MacCommand {
                                 .then(Commands.argument("player", StringArgumentType.word())
                                         .suggests(SUGGEST_PLAYERS)
                                         .then(Commands.argument("list", StringArgumentType.word())
-                                                .suggests(SUGGEST_ACTIVE)
+                                                .suggests(SUGGEST_LEARN)
                                                 .executes(ctx -> run(ctx, c -> learn(
                                                         c,
                                                         StringArgumentType.getString(c, "player"),
@@ -154,7 +172,7 @@ public final class MacCommand {
                 .then(Commands.literal("list").executes(ctx -> run(ctx, MacCommand::exemptList)))
                 .then(Commands.literal("add")
                         .then(Commands.argument("player", StringArgumentType.word())
-                                .suggests(SUGGEST_PLAYERS)
+                                .suggests(SUGGEST_EXEMPT)
                                 .executes(ctx -> run(ctx, c -> exemptAdd(
                                         c, StringArgumentType.getString(c, "player"))))))
                 .then(Commands.literal("remove")
@@ -232,7 +250,7 @@ public final class MacCommand {
             "/mac recent - 最近违规记录（最多展示 20 条）",
             "/mac check <玩家> - 查看玩家会话状态",
             "/mac audit <玩家> - 查看玩家历史 Mod 记录",
-            "/mac learn <玩家> <whitelist|blacklist> - 用玩家 Mod 清单一键建名单",
+            "/mac learn <玩家> <whitelist|blacklist|required> - 用玩家 Mod 清单一键建名单",
             "/mac reload - 从配置文件重新加载规则",
             "/mac save - 保存当前配置到文件",
             "/mac recheck - 用最新规则对在线玩家复检",
@@ -240,7 +258,7 @@ public final class MacCommand {
             "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
             "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
             "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
-            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
+            "/mac exempt list|add|remove <玩家|@ops> - 管理豁免名单（@ops 批量写入所有在线 OP）",
             "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
             "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
             "/mac whitelist list|add|remove <id> - 管理白名单",
@@ -339,6 +357,10 @@ public final class MacCommand {
     }
 
     private static int learn(CommandContext<CommandSourceStack> ctx, String name, String list) {
+        if (list.equalsIgnoreCase("required")) {
+            send(ctx, service().learnRequired(name));
+            return 1;
+        }
         PolicyMode pm = PolicyMode.byKey(list);
         if (pm == PolicyMode.SWITCH) {
             return fail("learn 只能用于 whitelist 或 blacklist。");
@@ -413,6 +435,16 @@ public final class MacCommand {
     }
 
     private static int exemptAdd(CommandContext<CommandSourceStack> ctx, String player) {
+        if (player.equalsIgnoreCase("@ops")) {
+            List<String> ops = new ArrayList<>();
+            for (ServerPlayer p : ctx.getSource().getServer().getPlayerList().getPlayers()) {
+                if (ctx.getSource().getServer().getPlayerList().isOp(p.getGameProfile())) {
+                    ops.add(p.getGameProfile().getName());
+                }
+            }
+            send(ctx, service().exemptAddAll(ops));
+            return 1;
+        }
         List<String> list = cfg().getExemptPlayers();
         for (String i : list) {
             if (i.equalsIgnoreCase(player)) {

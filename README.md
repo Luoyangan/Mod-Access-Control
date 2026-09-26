@@ -163,7 +163,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac recent` | 最近违规记录（最新在前，最多 20 条展示） |
 | `/mac check <玩家>` | 查看指定玩家会话状态（玩家参数可 Tab 补全） |
 | `/mac audit <玩家>` | 查看指定玩家最近的历史 Mod 记录（最多 10 条，来自 JSONL 持久记录） |
-| `/mac learn <玩家> <whitelist/blacklist>` | 用该玩家在线/最近一次 Mod 清单一键写入白名单或黑名单 |
+| `/mac learn <玩家> <whitelist/blacklist/required>` | 用该玩家在线/最近一次 Mod 清单一键写入白名单、黑名单或必需清单（自动跳过本模组与忽略项） |
 | `/mac reload` | 从配置文件重新加载规则 |
 | `/mac save` | 把当前内存配置保存到文件 |
 | `/mac recheck` | 用最新规则对在线玩家立即复检一次 |
@@ -171,7 +171,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac dryrun <true/false>` | 试运行开关（违规不实际踢出） |
 | `/mac mode <whitelist/blacklist/switch>` | 设置策略模式（Tab 可补全） |
 | `/mac active <whitelist/blacklist>` | 设置 switch 模式下生效的策略（Tab 可补全） |
-| `/mac exempt list\|add <玩家>\|remove <玩家>` | 管理豁免名单（移除项 Tab 可补全） |
+| `/mac exempt list\|add <玩家\|@ops>\|remove <玩家>` | 管理豁免名单（`add @ops` 一键写入所有在线 OP；移除项 Tab 可补全） |
 | `/mac allowedmac list\|add <版本>\|remove <版本>` | 管理允许接入的本模组版本（空 = 放行任意；`add *` 清空限制） |
 | `/mac required list` | 列出必需 Mod |
 | `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
@@ -180,7 +180,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单（移除项 Tab 可补全） |
 
 > 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
-> `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
+> `check/audit/learn/exempt add` 的玩家参数均提供在线候选（`exempt add` 额外支持 `@ops`），降低误输。
 
 所有修改会即时写盘并影响下一名玩家 / 下一次复检。
 
@@ -226,7 +226,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
   用于上线前验证规则是否误伤。
 - **Mod 历史**：每个通过/被拒玩家在握手结束时把完整 Mod 清单写入
   `config/mod_access_control_history.jsonl`（最长保留 2 万条 / 8MB），可用 `/mac audit` 审计，
-  或 `/mac learn` 一键把它写入白名单 / 黑名单。
+  或 `/mac learn` 一键把它写入白名单 / 黑名单 / 必需清单。
 - **管理员**：每次拦截通过聊天 + ActionBar + 铁砧音效广播（`[MAC] 违规拦截: 玩家 -> 原因`），
   无在线管理员时降级为服务端日志；历史记录可用 `/mac recent` 查看。
 

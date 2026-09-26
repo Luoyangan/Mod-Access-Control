@@ -13,6 +13,7 @@ import mcyszl.top.mod_access_control.forge.Holder;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.Style;
@@ -30,10 +31,10 @@ import java.util.List;
  * 管理员命令 /mac（权限等级 2）——1.12.2 pre-Brigadier 的 ICommand 实现。
  *
  * <p>子命令与 1.20.1 Brigadier 版保持一致：help [页码] / status / recent / check &lt;玩家&gt; /
- * audit &lt;玩家&gt; / learn &lt;玩家&gt; &lt;whitelist|blacklist&gt; / reload / save /
+ * audit &lt;玩家&gt; / learn &lt;玩家&gt; &lt;whitelist|blacklist|required&gt; / reload / save /
  * recheck / enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove / allowedmac list|add|remove /
+ * exempt list|add|remove（add 支持 @ops 批量写入在线 OP）/ allowedmac list|add|remove /
  * required list|add|remove / whitelist list|add|remove /
  * blacklist list|add|remove。</p>
  */
@@ -47,6 +48,7 @@ public final class MacCommand extends CommandBase {
     private static final List<String> BOOLS = Arrays.asList("true", "false");
     private static final List<String> MODES = Arrays.asList("whitelist", "blacklist", "switch");
     private static final List<String> ACTIVE_MODES = Arrays.asList("whitelist", "blacklist");
+    private static final List<String> LEARN_MODES = Arrays.asList("whitelist", "blacklist", "required");
 
     @Override
     public String getName() {
@@ -66,7 +68,7 @@ public final class MacCommand extends CommandBase {
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
         try {
-            dispatch(sender, args);
+            dispatch(server, sender, args);
         } catch (MacCmdException ex) {
             send(sender, ex.getMessage(), TextFormatting.RED);
         } catch (Exception ex) {
@@ -74,7 +76,7 @@ public final class MacCommand extends CommandBase {
         }
     }
 
-    private void dispatch(ICommandSender sender, String[] args) {
+    private void dispatch(MinecraftServer server, ICommandSender sender, String[] args) {
         String sub = args.length == 0 ? "status" : args[0].toLowerCase();
         if (sub.equals("help")) {
             sendHelp(sender, args);
@@ -125,8 +127,12 @@ public final class MacCommand extends CommandBase {
             return;
         }
         if (sub.equals("learn")) {
-            String name = argOrThrow(args, 1, "用法: /mac learn <玩家> <whitelist|blacklist>");
-            String list = argOrThrow(args, 2, "用法: /mac learn <玩家> <whitelist|blacklist>");
+            String name = argOrThrow(args, 1, "用法: /mac learn <玩家> <whitelist|blacklist|required>");
+            String list = argOrThrow(args, 2, "用法: /mac learn <玩家> <whitelist|blacklist|required>");
+            if (list.equalsIgnoreCase("required")) {
+                send(sender, service().learnRequired(name), TextFormatting.GREEN);
+                return;
+            }
             PolicyMode pm = PolicyMode.byKey(list);
             if (pm == PolicyMode.SWITCH) {
                 throw new MacCmdException("learn 只能用于 whitelist 或 blacklist。");
@@ -183,6 +189,17 @@ public final class MacCommand extends CommandBase {
             return;
         }
         if (sub.equals("exempt")) {
+            if (args.length >= 3 && "add".equalsIgnoreCase(args[1])
+                    && "@ops".equalsIgnoreCase(args[2])) {
+                List<String> ops = new ArrayList<>();
+                for (EntityPlayerMP p : server.getPlayerList().getPlayers()) {
+                    if (server.getPlayerList().canSendCommands(p.getGameProfile())) {
+                        ops.add(p.getGameProfile().getName());
+                    }
+                }
+                send(sender, service().exemptAddAll(ops), TextFormatting.GREEN);
+                return;
+            }
             listOp(sender, args, "豁免名单", new ListOp() {
                 @Override
                 public List<String> list() {
@@ -316,7 +333,7 @@ public final class MacCommand extends CommandBase {
             "/mac recent - 最近违规记录（最多展示 20 条）",
             "/mac check <玩家> - 查看玩家会话状态",
             "/mac audit <玩家> - 查看玩家历史 Mod 记录",
-            "/mac learn <玩家> <whitelist|blacklist> - 用玩家 Mod 清单一键建名单",
+            "/mac learn <玩家> <whitelist|blacklist|required> - 用玩家 Mod 清单一键建名单",
             "/mac reload - 从配置文件重新加载规则",
             "/mac save - 保存当前配置到文件",
             "/mac recheck - 用最新规则对在线玩家复检",
@@ -324,7 +341,7 @@ public final class MacCommand extends CommandBase {
             "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
             "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
             "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
-            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
+            "/mac exempt list|add|remove <玩家|@ops> - 管理豁免名单（@ops 批量写入所有在线 OP）",
             "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
             "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
             "/mac whitelist list|add|remove <id> - 管理白名单",
@@ -477,10 +494,15 @@ public final class MacCommand extends CommandBase {
         }
         if (args.length == 3) {
             if (sub.equals("learn")) {
-                return getListOfStringsMatchingLastWord(args, ACTIVE_MODES);
+                return getListOfStringsMatchingLastWord(args, LEARN_MODES);
             }
             if (sub.equals("exempt") && "add".equalsIgnoreCase(args[1])) {
-                return playerNames(server, args);
+                List<String> opts = new ArrayList<>();
+                opts.add("@ops");
+                for (String n : playerNames(server, args)) {
+                    opts.add(n);
+                }
+                return getListOfStringsMatchingLastWord(args, opts);
             }
             if (sub.equals("exempt") && "remove".equalsIgnoreCase(args[1])) {
                 return getListOfStringsMatchingLastWord(args, cfg().getExemptPlayers());
