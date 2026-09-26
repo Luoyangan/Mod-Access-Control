@@ -5,6 +5,7 @@ package mcyszl.top.mod_access_control.forge.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -23,14 +24,16 @@ import net.minecraft.util.text.IFormattableTextComponent;
 import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.util.text.TextFormatting;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
  * 管理员命令 /mac（权限等级 2）。
  *
- * <p>子命令：status / recent / check &lt;玩家&gt; / audit &lt;玩家&gt; /
+ * <p>子命令：help [页码] / status / recent / check &lt;玩家&gt; / audit &lt;玩家&gt; /
  * learn &lt;玩家&gt; &lt;whitelist|blacklist&gt; / reload / save / recheck /
  * enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
@@ -66,10 +69,11 @@ public final class MacCommand {
         return b.buildFuture();
     };
 
-    private static SuggestionProvider<CommandSource> suggestIds(List<String> source) {
+    private static SuggestionProvider<CommandSource> suggestIds(Supplier<List<String>> source) {
         return (ctx, b) -> {
-            if (source != null) {
-                for (String s : source) {
+            List<String> ids = source.get();
+            if (ids != null) {
+                for (String s : ids) {
                     b.suggest(s);
                 }
             }
@@ -78,7 +82,7 @@ public final class MacCommand {
     }
 
     private static SuggestionProvider<CommandSource> suggestRequiredIds() {
-        return suggestIds(cfg().getRequiredMods().stream()
+        return suggestIds(() -> cfg().getRequiredMods().stream()
                 .map(RequiredModRule::getId)
                 .collect(Collectors.toList()));
     }
@@ -141,6 +145,7 @@ public final class MacCommand {
                         // ---- 白名单 / 黑名单
                         .then(whitelistNode())
                         .then(blacklistNode())
+                        .then(helpNode())
         );
     }
 
@@ -154,7 +159,7 @@ public final class MacCommand {
                                         c, StringArgumentType.getString(c, "player"))))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("player", StringArgumentType.word())
-                                .suggests(suggestIds(cfg().getExemptPlayers()))
+                                .suggests(suggestIds(() -> cfg().getExemptPlayers()))
                                 .executes(ctx -> run(ctx, c -> exemptRemove(
                                         c, StringArgumentType.getString(c, "player"))))));
     }
@@ -169,7 +174,7 @@ public final class MacCommand {
                                         c, StringArgumentType.getString(c, "version"))))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("version", StringArgumentType.word())
-                                .suggests(suggestIds(cfg().getAllowedMacVersions()))
+                                .suggests(suggestIds(() -> cfg().getAllowedMacVersions()))
                                 .executes(ctx -> run(ctx, c -> allowedMacRemove(
                                         c, StringArgumentType.getString(c, "version"))))));
     }
@@ -201,7 +206,7 @@ public final class MacCommand {
                                         c, StringArgumentType.getString(c, "id"))))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(suggestIds(cfg().getPolicy().getWhitelist()))
+                                .suggests(suggestIds(() -> cfg().getPolicy().getWhitelist()))
                                 .executes(ctx -> run(ctx, c -> whiteRemove(
                                         c, StringArgumentType.getString(c, "id"))))));
     }
@@ -215,9 +220,57 @@ public final class MacCommand {
                                         c, StringArgumentType.getString(c, "id"))))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(suggestIds(cfg().getPolicy().getBlacklist()))
+                                .suggests(suggestIds(() -> cfg().getPolicy().getBlacklist()))
                                 .executes(ctx -> run(ctx, c -> blackRemove(
                                         c, StringArgumentType.getString(c, "id"))))));
+    }
+
+    // ------------------------------------------------------------------ 分页帮助
+
+    private static final List<String> HELP_LINES = Arrays.asList(
+            "/mac 或 /mac status - 查看当前策略与会话状态",
+            "/mac recent - 最近违规记录（最多展示 20 条）",
+            "/mac check <玩家> - 查看玩家会话状态",
+            "/mac audit <玩家> - 查看玩家历史 Mod 记录",
+            "/mac learn <玩家> <whitelist|blacklist> - 用玩家 Mod 清单一键建名单",
+            "/mac reload - 从配置文件重新加载规则",
+            "/mac save - 保存当前配置到文件",
+            "/mac recheck - 用最新规则对在线玩家复检",
+            "/mac enabled <true|false> - 总开关",
+            "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
+            "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
+            "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
+            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
+            "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
+            "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
+            "/mac whitelist list|add|remove <id> - 管理白名单",
+            "/mac blacklist list|add|remove <id> - 管理黑名单");
+
+    private static LiteralArgumentBuilder<CommandSource> helpNode() {
+        return Commands.literal("help")
+                .executes(ctx -> run(ctx, c -> help(c, 1)))
+                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                        .executes(ctx -> run(ctx, c -> help(c,
+                                IntegerArgumentType.getInteger(c, "page")))));
+    }
+
+    private static int help(CommandContext<CommandSource> ctx, int page) {
+        int perPage = 10;
+        int pages = (HELP_LINES.size() + perPage - 1) / perPage;
+        if (page < 1) {
+            page = 1;
+        }
+        if (page > pages) {
+            page = pages;
+        }
+        send(ctx, "===== /mac 帮助 第 " + page + "/" + pages + " 页 =====");
+        for (int i = (page - 1) * perPage; i < page * perPage && i < HELP_LINES.size(); i++) {
+            send(ctx, HELP_LINES.get(i));
+        }
+        if (page < pages) {
+            send(ctx, "下一页: /mac help " + (page + 1));
+        }
+        return 1;
     }
 
     // ------------------------------------------------------------------ 统一执行壳

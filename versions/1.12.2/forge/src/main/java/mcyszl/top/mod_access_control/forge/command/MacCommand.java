@@ -29,7 +29,7 @@ import java.util.List;
 /**
  * 管理员命令 /mac（权限等级 2）——1.12.2 pre-Brigadier 的 ICommand 实现。
  *
- * <p>子命令与 1.20.1 Brigadier 版保持一致：status / recent / check &lt;玩家&gt; /
+ * <p>子命令与 1.20.1 Brigadier 版保持一致：help [页码] / status / recent / check &lt;玩家&gt; /
  * audit &lt;玩家&gt; / learn &lt;玩家&gt; &lt;whitelist|blacklist&gt; / reload / save /
  * recheck / enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
@@ -40,7 +40,7 @@ import java.util.List;
 public final class MacCommand extends CommandBase {
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
-            "status", "recent", "check", "audit", "learn", "reload", "save", "recheck",
+            "help", "status", "recent", "check", "audit", "learn", "reload", "save", "recheck",
             "enabled", "dryrun", "mode", "active", "exempt", "allowedmac",
             "required", "whitelist", "blacklist");
     private static final List<String> LIST_SUBS = Arrays.asList("list", "add", "remove");
@@ -55,7 +55,7 @@ public final class MacCommand extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/mac <status|recent|check|audit|learn|reload|save|recheck|enabled|dryrun|mode|active|exempt|allowedmac|required|whitelist|blacklist> ...";
+        return "/mac <help|status|recent|check|audit|learn|reload|save|recheck|enabled|dryrun|mode|active|exempt|allowedmac|required|whitelist|blacklist> ...";
     }
 
     @Override
@@ -76,6 +76,10 @@ public final class MacCommand extends CommandBase {
 
     private void dispatch(ICommandSender sender, String[] args) {
         String sub = args.length == 0 ? "status" : args[0].toLowerCase();
+        if (sub.equals("help")) {
+            sendHelp(sender, args);
+            return;
+        }
         if (sub.equals("status")) {
             for (String l : service().statusLines()) {
                 send(sender, l, TextFormatting.GREEN);
@@ -254,8 +258,8 @@ public final class MacCommand extends CommandBase {
             }
             if (args.length >= 3 && "remove".equalsIgnoreCase(args[1])) {
                 String id = args[2];
-                boolean removed = cfg().getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(id));
-                if (!removed) {
+                boolean had = cfg().getRequiredMods().stream().anyMatch(r -> r.getId().equalsIgnoreCase(id));
+                if (!had) {
                     throw new MacCmdException("清单中不存在: " + id);
                 }
                 update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(id)));
@@ -303,6 +307,52 @@ public final class MacCommand extends CommandBase {
             return;
         }
         throw new MacCmdException("未知子命令: " + sub + "。" + getUsage(sender));
+    }
+
+    // ------------------------------------------------------------------ 分页帮助
+
+    private static final List<String> HELP_LINES = Arrays.asList(
+            "/mac 或 /mac status - 查看当前策略与会话状态",
+            "/mac recent - 最近违规记录（最多展示 20 条）",
+            "/mac check <玩家> - 查看玩家会话状态",
+            "/mac audit <玩家> - 查看玩家历史 Mod 记录",
+            "/mac learn <玩家> <whitelist|blacklist> - 用玩家 Mod 清单一键建名单",
+            "/mac reload - 从配置文件重新加载规则",
+            "/mac save - 保存当前配置到文件",
+            "/mac recheck - 用最新规则对在线玩家复检",
+            "/mac enabled <true|false> - 总开关",
+            "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
+            "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
+            "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
+            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
+            "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
+            "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
+            "/mac whitelist list|add|remove <id> - 管理白名单",
+            "/mac blacklist list|add|remove <id> - 管理黑名单");
+
+    private void sendHelp(ICommandSender sender, String[] args) {
+        int perPage = 10;
+        int pages = (HELP_LINES.size() + perPage - 1) / perPage;
+        int page = 1;
+        if (args.length >= 2) {
+            try {
+                page = Integer.parseInt(args[1]);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (page < 1) {
+            page = 1;
+        }
+        if (page > pages) {
+            page = pages;
+        }
+        send(sender, "===== /mac 帮助 第 " + page + "/" + pages + " 页 =====", TextFormatting.GREEN);
+        for (int i = (page - 1) * perPage; i < page * perPage && i < HELP_LINES.size(); i++) {
+            send(sender, HELP_LINES.get(i), TextFormatting.GREEN);
+        }
+        if (page < pages) {
+            send(sender, "下一页: /mac help " + (page + 1), TextFormatting.GREEN);
+        }
     }
 
     // ------------------------------------------------------------------ 列表型子命令公共壳
@@ -405,6 +455,9 @@ public final class MacCommand extends CommandBase {
         }
         String sub = args[0].toLowerCase();
         if (args.length == 2) {
+            if (sub.equals("help")) {
+                return getListOfStringsMatchingLastWord(args, Arrays.asList("1", "2"));
+            }
             if (sub.equals("check") || sub.equals("audit") || sub.equals("learn")) {
                 return playerNames(server, args);
             }
