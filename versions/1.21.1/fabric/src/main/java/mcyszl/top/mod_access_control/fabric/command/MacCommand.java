@@ -31,8 +31,9 @@ import java.util.function.Consumer;
  * learn &lt;玩家&gt; &lt;whitelist|blacklist&gt; / reload / save / recheck /
  * enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove / required list|add|remove /
- * whitelist list|add|remove / blacklist list|add|remove。</p>
+ * exempt list|add|remove / allowedmac list|add|remove /
+ * required list|add|remove / whitelist list|add|remove /
+ * blacklist list|add|remove。</p>
  *
  * <p>枚举参数（mode/active/learn）与列表移除、玩家名参数均带 Brigadier 自动补全。</p>
  */
@@ -442,13 +443,13 @@ public final class MacCommand {
 
     private static int requiredRemove(CommandContext<CommandSourceStack> ctx, String id) {
         final String key = id;
-        boolean removed = cfg().getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key));
-        if (removed) {
-            update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key)));
-            send(ctx, "已移除必需 Mod: " + key);
-            return 1;
+        boolean had = cfg().getRequiredMods().stream().anyMatch(r -> r.getId().equalsIgnoreCase(key));
+        if (!had) {
+            return fail("清单中不存在: " + key);
         }
-        return fail("清单中不存在: " + key);
+        update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key)));
+        send(ctx, "已移除必需 Mod: " + key);
+        return 1;
     }
 
     private static int whiteList(CommandContext<CommandSourceStack> ctx) {

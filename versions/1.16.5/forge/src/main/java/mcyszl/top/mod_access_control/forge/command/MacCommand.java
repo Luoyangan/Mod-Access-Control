@@ -464,13 +464,13 @@ public final class MacCommand {
 
     private static int requiredRemove(CommandContext<CommandSource> ctx, String id) {
         final String key = id;
-        boolean removed = cfg().getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key));
-        if (removed) {
-            update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key)));
-            send(ctx, "已移除必需 Mod: " + key);
-            return 1;
+        boolean had = cfg().getRequiredMods().stream().anyMatch(r -> r.getId().equalsIgnoreCase(key));
+        if (!had) {
+            return fail("清单中不存在: " + key);
         }
-        return fail("清单中不存在: " + key);
+        update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key)));
+        send(ctx, "已移除必需 Mod: " + key);
+        return 1;
     }
 
     private static int whiteList(CommandContext<CommandSource> ctx) {
