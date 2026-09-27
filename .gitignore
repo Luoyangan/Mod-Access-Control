@@ -127,3 +127,5 @@ run-*/
 
 # 编译输出目录（IntelliJ / Eclipse 产物）
 **/bin/
+
+docs/
