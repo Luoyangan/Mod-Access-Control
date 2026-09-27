@@ -1,0 +1,18 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+// 注意：foojay-resolver-convention 必须 >= 0.8.0 —— 0.7.0 自带的 Gson 2.9.1
+// 会与 Loom 的版本清单解析冲突（Java 17+ 上 final 字段反射赋值失败，loom#1020）。
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+rootProject.name = 'mod-access-control-fabric'
