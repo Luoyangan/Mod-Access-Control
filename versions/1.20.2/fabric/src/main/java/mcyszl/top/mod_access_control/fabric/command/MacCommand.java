@@ -12,6 +12,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
 import mcyszl.top.mod_access_control.core.model.RequiredModRule;
 import mcyszl.top.mod_access_control.core.session.ViolationRecord;
@@ -205,11 +206,15 @@ public final class MacCommand {
                 .then(Commands.literal("list").executes(ctx -> run(ctx, MacCommand::whiteList)))
                 .then(Commands.literal("add")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(ctx -> run(ctx, c -> whiteAdd(
-                                        c, StringArgumentType.getString(c, "id"))))))
+                                .then(Commands.argument("spec", StringArgumentType.greedyString())
+                                        .executes(ctx -> run(ctx, c -> whiteAdd(c,
+                                                StringArgumentType.getString(c, "id"),
+                                                StringArgumentType.getString(c, "spec")))))
+                                .executes(ctx -> run(ctx, c -> whiteAdd(c,
+                                        StringArgumentType.getString(c, "id"), "")))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(suggestIds(() -> cfg().getPolicy().getWhitelist()))
+                                .suggests(suggestPolicyIds(true))
                                 .executes(ctx -> run(ctx, c -> whiteRemove(
                                         c, StringArgumentType.getString(c, "id"))))));
     }
@@ -219,13 +224,30 @@ public final class MacCommand {
                 .then(Commands.literal("list").executes(ctx -> run(ctx, MacCommand::blackList)))
                 .then(Commands.literal("add")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(ctx -> run(ctx, c -> blackAdd(
-                                        c, StringArgumentType.getString(c, "id"))))))
+                                .then(Commands.argument("spec", StringArgumentType.greedyString())
+                                        .executes(ctx -> run(ctx, c -> blackAdd(c,
+                                                StringArgumentType.getString(c, "id"),
+                                                StringArgumentType.getString(c, "spec")))))
+                                .executes(ctx -> run(ctx, c -> blackAdd(c,
+                                        StringArgumentType.getString(c, "id"), "")))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(suggestIds(() -> cfg().getPolicy().getBlacklist()))
+                                .suggests(suggestPolicyIds(false))
                                 .executes(ctx -> run(ctx, c -> blackRemove(
                                         c, StringArgumentType.getString(c, "id"))))));
+    }
+
+    /** 白/黑名单条目 id 补全（含 * 通配符条目）。 */
+    private static SuggestionProvider<CommandSourceStack> suggestPolicyIds(boolean whitelist) {
+        return suggestIds(() -> {
+            List<PolicyEntry> list = whitelist
+                    ? cfg().getPolicy().getWhitelist() : cfg().getPolicy().getBlacklist();
+            List<String> ids = new java.util.ArrayList<>();
+            for (PolicyEntry e : list) {
+                ids.add(e.getId());
+            }
+            return ids;
+        });
     }
 
     // ------------------------------------------------------------------ 分页帮助
@@ -246,8 +268,8 @@ public final class MacCommand {
             "/mac exempt list|add|remove <玩家> - 管理豁免名单",
             "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
             "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
-            "/mac whitelist list|add|remove <id> - 管理白名单",
-            "/mac blacklist list|add|remove <id> - 管理黑名单");
+            "/mac whitelist list|add|remove <id> [约束] - 管理白名单（add 支持 * 通配符与版本约束）",
+            "/mac blacklist list|add|remove <id> [约束] - 管理黑名单（add 支持 * 通配符与版本约束）");
 
     private static LiteralArgumentBuilder<CommandSourceStack> helpNode() {
         return Commands.literal("help")
@@ -518,64 +540,52 @@ public final class MacCommand {
     }
 
     private static int whiteList(CommandContext<CommandSourceStack> ctx) {
-        return listIds(ctx, "白名单", cfg().getPolicy().getWhitelist());
+        return policyList(ctx, true);
     }
 
-    private static int whiteAdd(CommandContext<CommandSourceStack> ctx, String id) {
-        return addId(ctx, "白名单", cfg().getPolicy().getWhitelist(), id, c -> c.getPolicy().getWhitelist().add(id));
+    private static int whiteAdd(CommandContext<CommandSourceStack> ctx, String id, String spec) {
+        return policyAddResult(ctx, service().policyAdd(true, id, spec));
     }
 
     private static int whiteRemove(CommandContext<CommandSourceStack> ctx, String id) {
-        return removeId(ctx, "白名单", cfg().getPolicy().getWhitelist(), id, c -> c.getPolicy().getWhitelist().removeIf(i -> i.equalsIgnoreCase(id)));
+        return policyAddResult(ctx, service().policyRemove(true, id));
     }
 
     private static int blackList(CommandContext<CommandSourceStack> ctx) {
-        return listIds(ctx, "黑名单", cfg().getPolicy().getBlacklist());
+        return policyList(ctx, false);
     }
 
-    private static int blackAdd(CommandContext<CommandSourceStack> ctx, String id) {
-        return addId(ctx, "黑名单", cfg().getPolicy().getBlacklist(), id, c -> c.getPolicy().getBlacklist().add(id));
+    private static int blackAdd(CommandContext<CommandSourceStack> ctx, String id, String spec) {
+        return policyAddResult(ctx, service().policyAdd(false, id, spec));
     }
 
     private static int blackRemove(CommandContext<CommandSourceStack> ctx, String id) {
-        return removeId(ctx, "黑名单", cfg().getPolicy().getBlacklist(), id, c -> c.getPolicy().getBlacklist().removeIf(i -> i.equalsIgnoreCase(id)));
+        return policyAddResult(ctx, service().policyRemove(false, id));
     }
 
-    // ------------------------------------------------------------------ 工具
-
-    private static int listIds(CommandContext<CommandSourceStack> ctx, String name, List<String> ids) {
-        if (ids.isEmpty()) {
+    private static int policyList(CommandContext<CommandSourceStack> ctx, boolean whitelist) {
+        List<String> lines = service().policyLines(whitelist);
+        String name = whitelist ? "白名单" : "黑名单";
+        if (lines.isEmpty()) {
             send(ctx, name + "为空。");
             return 1;
         }
-        send(ctx, name + "（" + ids.size() + " 项）：");
-        for (String s : ids) {
-            send(ctx, "  - " + s);
+        send(ctx, name + "（" + lines.size() + " 项，add 支持 * 通配符与版本约束）：");
+        for (String s : lines) {
+            send(ctx, s);
         }
         return 1;
     }
 
-    private static int addId(CommandContext<CommandSourceStack> ctx, String name, List<String> cur,
-                             String id, Consumer<MacConfig> apply) {
-        if (cur.stream().anyMatch(i -> i.equalsIgnoreCase(id))) {
-            send(ctx, id + " 已存在于" + name + "。");
-            return 1;
+    private static int policyAddResult(CommandContext<CommandSourceStack> ctx, String result) {
+        if (result.startsWith("!")) {
+            return fail(result.substring(1));
         }
-        update(apply);
-        send(ctx, "已向" + name + "加入: " + id);
+        send(ctx, result);
         return 1;
     }
 
-    private static int removeId(CommandContext<CommandSourceStack> ctx, String name, List<String> cur,
-                                String id, Consumer<MacConfig> apply) {
-        boolean had = cur.stream().anyMatch(i -> i.equalsIgnoreCase(id));
-        if (!had) {
-            return fail(name + "中不存在: " + id);
-        }
-        update(apply);
-        send(ctx, "已从" + name + "移除: " + id);
-        return 1;
-    }
+    // ------------------------------------------------------------------ 工具
 
     private static int fail(String text) {
         throw new IllegalArgumentException(text);

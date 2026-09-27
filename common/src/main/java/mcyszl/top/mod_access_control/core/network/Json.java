@@ -5,6 +5,8 @@ package mcyszl.top.mod_access_control.core.network;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import mcyszl.top.mod_access_control.core.config.PolicyEntryTypeAdapter;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 
 /**
  * 跨加载器统一网络消息的 JSON 编解码工具。
@@ -16,7 +18,17 @@ public final class Json {
 
     private static final Gson GSON = new GsonBuilder()
             .disableHtmlEscaping()
+            .registerTypeAdapter(PolicyEntry.class, new PolicyEntryTypeAdapter())
             .create();
+
+    /** 配置文件读写用的 Gson（美化输出，含全部 TypeAdapter）。 */
+    public static Gson prettyGson() {
+        return new GsonBuilder()
+                .setPrettyPrinting()
+                .disableHtmlEscaping()
+                .registerTypeAdapter(PolicyEntry.class, new PolicyEntryTypeAdapter())
+                .create();
+    }
 
     private Json() {
     }

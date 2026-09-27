@@ -5,6 +5,7 @@ package mcyszl.top.mod_access_control.forge.command;
 
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
 import mcyszl.top.mod_access_control.core.model.RequiredModRule;
 import mcyszl.top.mod_access_control.core.service.MacService;
@@ -34,8 +35,8 @@ import java.util.List;
  * recheck / enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
  * exempt list|add|remove / allowedmac list|add|remove /
- * required list|add|remove / whitelist list|add|remove /
- * blacklist list|add|remove。</p>
+ * required list|add|remove / whitelist list|add|remove &lt;id&gt; [约束] /
+ * blacklist list|add|remove &lt;id&gt; [约束]。</p>
  */
 public final class MacCommand extends CommandBase {
 
@@ -274,41 +275,11 @@ public final class MacCommand extends CommandBase {
             throw new MacCmdException("用法: /mac required list | add <id> [版本约束] | remove <id>");
         }
         if (sub.equals("whitelist")) {
-            listOp(sender, args, "白名单", new ListOp() {
-                @Override
-                public List<String> list() {
-                    return cfg().getPolicy().getWhitelist();
-                }
-
-                @Override
-                public void add(String id) {
-                    update(c -> c.getPolicy().getWhitelist().add(id));
-                }
-
-                @Override
-                public void remove(String id) {
-                    update(c -> c.getPolicy().getWhitelist().removeIf(i -> i.equalsIgnoreCase(id)));
-                }
-            });
+            policyOp(sender, args, true);
             return;
         }
         if (sub.equals("blacklist")) {
-            listOp(sender, args, "黑名单", new ListOp() {
-                @Override
-                public List<String> list() {
-                    return cfg().getPolicy().getBlacklist();
-                }
-
-                @Override
-                public void add(String id) {
-                    update(c -> c.getPolicy().getBlacklist().add(id));
-                }
-
-                @Override
-                public void remove(String id) {
-                    update(c -> c.getPolicy().getBlacklist().removeIf(i -> i.equalsIgnoreCase(id)));
-                }
-            });
+            policyOp(sender, args, false);
             return;
         }
         throw new MacCmdException("未知子命令: " + sub + "。" + getUsage(sender));
@@ -332,8 +303,8 @@ public final class MacCommand extends CommandBase {
             "/mac exempt list|add|remove <玩家> - 管理豁免名单",
             "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
             "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
-            "/mac whitelist list|add|remove <id> - 管理白名单",
-            "/mac blacklist list|add|remove <id> - 管理黑名单");
+            "/mac whitelist list|add|remove <id> [约束] - 管理白名单（add 支持 * 通配符与版本约束）",
+            "/mac blacklist list|add|remove <id> [约束] - 管理黑名单（add 支持 * 通配符与版本约束）");
 
     private void sendHelp(ICommandSender sender, String[] args) {
         int perPage = 10;
@@ -404,6 +375,49 @@ public final class MacCommand extends CommandBase {
             return;
         }
         throw new MacCmdException("用法: /mac " + args[0] + " list | add <id> | remove <id>");
+    }
+
+    // ------------------------------------------------------------------ 白/黑名单（PolicyEntry，支持 * 通配符与版本约束）
+
+    private void policyOp(ICommandSender sender, String[] args, boolean whitelist) {
+        String name = whitelist ? "白名单" : "黑名单";
+        if (args.length >= 2 && "list".equalsIgnoreCase(args[1])) {
+            List<String> lines = service().policyLines(whitelist);
+            if (lines.isEmpty()) {
+                send(sender, name + "为空。", TextFormatting.GREEN);
+                return;
+            }
+            send(sender, name + "（" + lines.size() + " 项，add 支持 * 通配符与版本约束）：", TextFormatting.GREEN);
+            for (String l : lines) {
+                send(sender, l, TextFormatting.GREEN);
+            }
+            return;
+        }
+        if (args.length >= 3 && "add".equalsIgnoreCase(args[1])) {
+            String id = args[2];
+            StringBuilder spec = new StringBuilder();
+            for (int i = 3; i < args.length; i++) {
+                if (spec.length() > 0) {
+                    spec.append(' ');
+                }
+                spec.append(args[i]);
+            }
+            policyResult(sender, service().policyAdd(whitelist, id, spec.toString()));
+            return;
+        }
+        if (args.length >= 3 && "remove".equalsIgnoreCase(args[1])) {
+            policyResult(sender, service().policyRemove(whitelist, args[2]));
+            return;
+        }
+        throw new MacCmdException("用法: /mac " + args[0] + " list | add <id> [约束] | remove <id>");
+    }
+
+    /** service 回显统一处理："!" 开头为失败提示（红色），其余为成功回显。 */
+    private void policyResult(ICommandSender sender, String result) {
+        if (result.startsWith("!")) {
+            throw new MacCmdException(result.substring(1));
+        }
+        send(sender, result, TextFormatting.GREEN);
     }
 
     // ------------------------------------------------------------------ 工具
@@ -497,9 +511,13 @@ public final class MacCommand extends CommandBase {
                 return getListOfStringsMatchingLastWord(args, requiredIds());
             }
             if ((sub.equals("whitelist") || sub.equals("blacklist")) && "remove".equalsIgnoreCase(args[1])) {
-                List<String> src = sub.equals("whitelist")
+                List<PolicyEntry> src = sub.equals("whitelist")
                         ? cfg().getPolicy().getWhitelist() : cfg().getPolicy().getBlacklist();
-                return getListOfStringsMatchingLastWord(args, src);
+                List<String> ids = new ArrayList<>();
+                for (PolicyEntry e : src) {
+                    ids.add(e.getId());
+                }
+                return getListOfStringsMatchingLastWord(args, ids);
             }
         }
         return Collections.emptyList();

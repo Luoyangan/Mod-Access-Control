@@ -10,6 +10,7 @@ import mcyszl.top.mod_access_control.core.feedback.FeedbackText;
 import mcyszl.top.mod_access_control.core.feedback.KickMessage;
 import mcyszl.top.mod_access_control.core.model.CheckMode;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
 import mcyszl.top.mod_access_control.core.model.RequiredModRule;
 import mcyszl.top.mod_access_control.core.network.Json;
@@ -479,7 +480,7 @@ public final class MacService {
             sourceDesc = "最近一次记录";
         }
         Set<String> ignore = ignoredIds(cfg);
-        List<String> target = toWhitelist
+        List<PolicyEntry> target = toWhitelist
                 ? cfg.getPolicy().getWhitelist() : cfg.getPolicy().getBlacklist();
         List<String> added = new ArrayList<>();
         int dup = 0;
@@ -493,11 +494,11 @@ public final class MacService {
                     skip++;
                     continue;
                 }
-                if (target.stream().anyMatch(i -> i.equalsIgnoreCase(m.id))) {
+                if (target.stream().anyMatch(i -> i.getId().equalsIgnoreCase(m.id))) {
                     dup++;
                     continue;
                 }
-                target.add(m.id);
+                target.add(new PolicyEntry(m.id));
                 added.add(m.id);
             }
         }
@@ -571,6 +572,56 @@ public final class MacService {
             sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
         }
         return sb.toString();
+    }
+
+    // ------------------------------------------------------------------ 黑白名单命令辅助
+
+    /** 白/黑名单列表回显（每行一条，含约束描述）。 */
+    public List<String> policyLines(boolean whitelist) {
+        List<PolicyEntry> list = whitelist
+                ? configManager.current().getPolicy().getWhitelist()
+                : configManager.current().getPolicy().getBlacklist();
+        List<String> out = new ArrayList<>();
+        for (PolicyEntry e : list) {
+            out.add("  - " + e.getId() + (e.hasBounds() ? "  约束: " + e.constraintText() : ""));
+        }
+        return out;
+    }
+
+    /**
+     * 向白/黑名单加入条目（同 id 覆盖更新），{@code spec} 为可选版本约束写法
+     * （如 {@code >=1.0.0}、{@code 1.0~2.0}、{@code --exact 1.2.3}），支持 {@code *} 通配符。
+     * 返回命令回显文本；失败时以 "!" 开头（适配层转为失败提示）。
+     */
+    public String policyAdd(boolean whitelist, String id, String spec) {
+        if (id == null || id.trim().isEmpty()) {
+            return "!Mod id 不能为空。";
+        }
+        final String key = id.trim();
+        PolicyEntry entry = new PolicyEntry(key);
+        entry.applySpec(spec);
+        String target = whitelist ? "白名单" : "黑名单";
+        List<PolicyEntry> list = whitelist
+                ? configManager.current().getPolicy().getWhitelist()
+                : configManager.current().getPolicy().getBlacklist();
+        boolean replaced = list.removeIf(e -> e.getId().equalsIgnoreCase(key));
+        configManager.updateAndSave(c -> (whitelist
+                ? c.getPolicy().getWhitelist() : c.getPolicy().getBlacklist()).add(entry));
+        return (replaced ? "已更新" + target + "条目: " : "已向" + target + "加入: ") + entry;
+    }
+
+    /** 从白/黑名单移除条目（忽略大小写）。返回命令回显文本；失败时以 "!" 开头。 */
+    public String policyRemove(boolean whitelist, String id) {
+        String target = whitelist ? "白名单" : "黑名单";
+        List<PolicyEntry> list = whitelist
+                ? configManager.current().getPolicy().getWhitelist()
+                : configManager.current().getPolicy().getBlacklist();
+        boolean had = list.removeIf(e -> e.getId().equalsIgnoreCase(id));
+        if (!had) {
+            return "!" + target + "中不存在: " + id;
+        }
+        configManager.save();
+        return "已从" + target + "移除: " + id;
     }
 
     // ------------------------------------------------------------------ 内部实现

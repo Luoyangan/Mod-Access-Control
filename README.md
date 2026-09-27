@@ -1,4 +1,4 @@
-# Mod Access Control（模组准入控制）
+﻿# Mod Access Control（模组准入控制）
 
 面向 **Minecraft** 的 **服务端** Mod：通过统一协议、服务端规则配置与
 **两阶段握手校验**，对客户端的 Mod 组合实施安全准入控制。同一份规则与同一套协议，
@@ -30,67 +30,7 @@
 
 ---
 
-## 二、目录结构
-
-```
-common/               # 跨加载器统一核心（纯 Java，不含任何加载器 / Minecraft 类）
-versions/1.21.1/      # 1.21.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
-  ├─ forge/           # 1.21.1 Forge 适配层（Forge 52.0.50）
-  ├─ fabric/          # 1.21.1 Fabric 适配层（Loader 0.19.5 / Fabric API 0.116.17+1.21.1）
-  └─ neoforge/        # 1.21.1 NeoForge 适配层（NeoForge 21.1.250，ModDevGradle）
-versions/1.20.1/      # 1.20.1 版本目录（Forge / Fabric / NeoForge 独立 Gradle 工程）
-  ├─ forge/           # 1.20.1 Forge 适配层（Forge 47.3.0）
-  ├─ fabric/          # 1.20.1 Fabric 适配层（Loader 0.15.11 / Fabric API 0.92.3+1.20.1）
-  └─ neoforge/        # 1.20.1 NeoForge 适配层（NeoForge 47.1.106，NeoGradle userdev）
-versions/1.16.5/      # 1.16.5 版本目录（Forge / Fabric 独立 Gradle 工程）
-  ├─ forge/           # 1.16.5 Forge 适配层（Forge 36.2.42，ForgeGradle 4.1，Java 8）
-  └─ fabric/          # 1.16.5 Fabric 适配层（Loader 0.15.11 / Fabric API 0.41.3+1.16，Java 8）
-versions/1.12.2/      # 1.12.2 版本目录（Forge 独立 Gradle 工程）
-  └─ forge/           # 1.12.2 Forge 适配层（Forge 14.23.5.2847，ForgeGradle 2.3，Java 8）
-```
-
-所有版本 / 加载器产物使用完全相同的：
-- `common` 核心逻辑（规则模型 / 校验引擎 / 会话状态机 / 协议 DTO）；
-- 配置文件格式（`config/mod_access_control.json`）与字段语义；
-- 网络协议（4 个逻辑消息：`stage1_req / stage1_resp / stage2_req / stage2_resp`，负载为 JSON 字符串）；
-- `/mac` 命令体系。
-
-仅以下平台差异由各适配层提供：Mod 列表读取接口、网络收发（通道注册 / 线程切换 /
-1.20.1 与 1.21.1 的版本化网络 API 差异）、服务器事件接线、配置文件路径与日志桥。
-
-> 说明：1.21.1 三端、1.20.1 三端、1.16.5 Forge/Fabric、1.12.2 Forge 产物均经本机真实
-> `gradle build` 编译验证通过（1.21.1 用 JDK 21；1.20.1 用 JDK 17 工具链自动获取；1.16.5
-> 用 JDK 17 + `--release 8` 编译出 Java 8 字节码；1.12.2 用 JDK 8 + Gradle 7.6.4 +
-> ForgeGradle 2.3 编译出 Java 8 字节码）。构建期间对 NeoForge maven 使用 IPv6 路由：
-> `JAVA_TOOL_OPTIONS=-Djava.net.preferIPv6Addresses=true`。
-
----
-
-## 三、构建
-
-各自在对应目录执行（Gradle wrapper 已内置；1.21.1 需要 JDK 21，1.20.1 会自动获取 JDK 17 工具链，
-1.16.5 用 JDK 17 运行构建并以 `--release 8` 产出 Java 8 字节码；1.12.2 需 JDK 8，
-Gradle 7.6.4 + ForgeGradle 2.3）：
-
-```powershell
-.\gradlew.bat build
-```
-
-调试运行（`client` / `server` run 任务）分别见各模块 `build.gradle`。
-
----
-
-## 四、安装
-
-1. 服务端：把与所用加载器对应的 jar 放入服务端 `mods/`；
-2. 客户端：**每个玩家客户端**的 `mods/` 也需放入同一 jar（用于自动应答握手）；
-3. 服务端第一次启动会自动生成默认配置 `config/mod_access_control.json`；
-4. 加载器需与服务器一致（Forge 服配 Forge 客户端，Fabric 服配 Fabric 客户端，
-   NeoForge 服配 NeoForge 客户端）；跨加载器握手会被“加载器兼容性”校验拦截。
-
----
-
-## 五、配置文件
+## 二、配置文件
 
 路径：`<服务器目录>/config/mod_access_control.json`（三个加载器完全一致）。
 
@@ -109,8 +49,8 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `policy.mode` | `"blacklist"` | 策略：`whitelist` / `blacklist` / `switch` |
 | `policy.activeMode` | `"whitelist"` | `switch` 模式下当前生效的策略 |
 | `policy.recheckIntervalSeconds` | `60` | 定期复检间隔（秒），`0` = 不复检 |
-| `policy.whitelist[]` | `[]` | 白名单（mod id） |
-| `policy.blacklist[]` | `[]` | 黑名单（mod id） |
+| `policy.whitelist[]` | `[]` | 白名单（mod id，支持 `*` 通配符；可选版本约束写法同必需 Mod） |
+| `policy.blacklist[]` | `[]` | 黑名单（mod id，支持 `*` 通配符；可选版本约束写法同必需 Mod） |
 | `ignoredModIds[]` | `[]` | 额外忽略的 mod id（不参与任何校验） |
 | `logViolations` | `true` | 违规事件是否写入服务端日志 |
 | `exemptPlayers[]` | `[]` | 豁免玩家：玩家名（忽略大小写）或 `uuid:` 前缀的 UUID |
@@ -140,7 +80,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 六、策略模式
+## 三、策略模式
 
 | 模式 | 行为 |
 | --- | --- |
@@ -154,7 +94,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 七、命令 `/mac`（权限等级 2）
+## 四、命令 `/mac`（权限等级 2）
 
 | 命令 | 作用 |
 | --- | --- |
@@ -176,8 +116,8 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 | `/mac required list` | 列出必需 Mod |
 | `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
 | `/mac required remove <id>` | 移除必需 Mod（Tab 可补全） |
-| `/mac whitelist list\|add <id>\|remove <id>` | 管理白名单（移除项 Tab 可补全） |
-| `/mac blacklist list\|add <id>\|remove <id>` | 管理黑名单（移除项 Tab 可补全） |
+| `/mac whitelist list\|add <id> [约束]\|remove <id>` | 管理白名单（add 支持 `*` 通配符与版本约束；移除项 Tab 可补全） |
+| `/mac blacklist list\|add <id> [约束]\|remove <id>` | 管理黑名单（add 支持 `*` 通配符与版本约束；移除项 Tab 可补全） |
 
 > 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
 > `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
@@ -186,7 +126,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 八、两阶段握手流程（三加载器一致）
+## 五、两阶段握手流程（三加载器一致）
 
 ```
 玩家加入
@@ -216,7 +156,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 九、玩家反馈与管理端提示
+## 六、玩家反馈与管理端提示
 
 - **被拒玩家**：断开原因组件由服务端直接构造纯文本（无翻译键依赖），逐条列出
   “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”；下方附加底部提示区（默认提示 +
@@ -232,7 +172,7 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 
 ---
 
-## 十、日志与错误处理
+## 七、日志与错误处理
 
 - 日志统一前缀 `[MAC]`，包含握手进度、放行 / 拒绝、配置加载与保存结果；
 - 配置文件损坏时自动备份为 `mod_access_control.json.invalid.bak` 并重建默认；
@@ -241,12 +181,12 @@ Gradle 7.6.4 + ForgeGradle 2.3）：
 - 玩家 Mod 历史为持久 JSONL 记录（`mod_access_control_history.jsonl`），重启不丢失，
   自动裁剪（最多 2 万条 / 8MB），供 `/mac audit` 与 `/mac learn` 使用。
 
-## 十一、License / 免责
+## 八、License / 免责
 
 本项目以 Apache License 2.0 发布（许可证全文见 `LICENSE`，版权署名与随附第三方组件见 `NOTICE`）；
 准入控制校验的是 mod 标识与版本组合，供服务器管理者表达
 **“允许/禁止安装哪些 Mod”** 的规则，不构成对文件级改动的防作弊保证。
 
-## 十二、版权
+## 九、版权
 
 @Copyright 2024-2026 原生之旅 | mcyszl.top Luoyangan

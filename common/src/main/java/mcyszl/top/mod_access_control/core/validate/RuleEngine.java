@@ -4,10 +4,10 @@
 package mcyszl.top.mod_access_control.core.validate;
 
 import mcyszl.top.mod_access_control.core.model.CheckMode;
+import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
 import mcyszl.top.mod_access_control.core.model.RequiredModRule;
 import mcyszl.top.mod_access_control.core.network.MacPackets.ClientMod;
-import mcyszl.top.mod_access_control.core.version.SemVer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,12 +69,15 @@ public final class RuleEngine {
     /**
      * 校验客户端完整 Mod 列表是否命中白名单 / 黑名单。
      *
+     * <p>条目支持 {@code *} 通配符与可选版本约束：命中 = id 匹配且版本满足约束
+     * （无约束 = 任意版本）。白名单：无任何条目命中即违规；黑名单：任一条目命中即违规。</p>
+     *
      * @param activePolicy 当前生效策略（SWITCH 时已由调用方解析为实际策略）
      */
     public static List<Problem> checkPolicy(List<ClientMod> clientMods,
                                             PolicyMode activePolicy,
-                                            List<String> whitelist,
-                                            List<String> blacklist,
+                                            List<PolicyEntry> whitelist,
+                                            List<PolicyEntry> blacklist,
                                             Set<String> ignoredIds) {
         List<Problem> problems = new ArrayList<>();
         if (clientMods == null || activePolicy == null || activePolicy == PolicyMode.SWITCH) {
@@ -85,15 +88,33 @@ public final class RuleEngine {
             if (mod.id == null || ignore.contains(mod.id)) {
                 continue;
             }
-            if (activePolicy == PolicyMode.WHITELIST
-                    && (whitelist == null || !whitelist.contains(mod.id))) {
-                problems.add(new Problem(ProblemType.NOT_WHITELISTED, mod.id, null, mod.version));
-            } else if (activePolicy == PolicyMode.BLACKLIST
-                    && blacklist != null && blacklist.contains(mod.id)) {
-                problems.add(new Problem(ProblemType.BLACKLISTED, mod.id, null, mod.version));
+            if (activePolicy == PolicyMode.WHITELIST) {
+                PolicyEntry hit = matchEntry(whitelist, mod);
+                if (hit == null) {
+                    problems.add(new Problem(ProblemType.NOT_WHITELISTED, mod.id, null, mod.version));
+                }
+            } else if (activePolicy == PolicyMode.BLACKLIST) {
+                PolicyEntry hit = matchEntry(blacklist, mod);
+                if (hit != null) {
+                    problems.add(new Problem(ProblemType.BLACKLISTED, mod.id,
+                            hit.constraintText(), mod.version));
+                }
             }
         }
         return problems;
+    }
+
+    /** 找到第一条命中（id 匹配且版本满足约束）的条目；无则返回 null。 */
+    private static PolicyEntry matchEntry(List<PolicyEntry> entries, ClientMod mod) {
+        if (entries == null) {
+            return null;
+        }
+        for (PolicyEntry e : entries) {
+            if (e != null && e.matchesId(mod.id) && e.matchesVersion(mod.version)) {
+                return e;
+            }
+        }
+        return null;
     }
 
     /**
@@ -111,51 +132,6 @@ public final class RuleEngine {
     }
 
     private static boolean versionAllowed(RequiredModRule rule, String actualVersion) {
-        SemVer actual = SemVer.parse(actualVersion);
-        List<RequiredModRule.Bound> bounds = rule.effectiveBounds();
-        if (bounds.isEmpty()) {
-            // 无版本约束：存在即可（缺失已在调用方处理）。
-            return true;
-        }
-        for (RequiredModRule.Bound b : bounds) {
-            if (!matchBound(b, actual)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** 用一条操作符约束比对客户端实际版本。 */
-    private static boolean matchBound(RequiredModRule.Bound bound, SemVer actual) {
-        SemVer want = SemVer.parse(bound.getVersion());
-        if (want == null) {
-            // 规则里配置的版本无法解析：当作无约束，避免误伤。
-            return true;
-        }
-        if (actual == null) {
-            // 客户端版本无法解析：仅 “!=” 可视为“确非该版本”成立。
-            return "!=".equals(bound.getOp());
-        }
-        int c = actual.compareTo(want);
-        String op = bound.getOp();
-        if ("=".equals(op)) {
-            return c == 0;
-        }
-        if ("!=".equals(op)) {
-            return c != 0;
-        }
-        if (">".equals(op)) {
-            return c > 0;
-        }
-        if (">=".equals(op)) {
-            return c >= 0;
-        }
-        if ("<".equals(op)) {
-            return c < 0;
-        }
-        if ("<=".equals(op)) {
-            return c <= 0;
-        }
-        return true;
+        return RequiredModRule.matchesBounds(rule.effectiveBounds(), actualVersion);
     }
 }

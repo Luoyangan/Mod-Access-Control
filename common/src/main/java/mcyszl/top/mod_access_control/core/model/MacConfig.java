@@ -265,11 +265,11 @@ public class MacConfig {
          */
         private int recheckIntervalSeconds = 60;
 
-        /** 白名单（mod id 列表）。 */
-        private List<String> whitelist = new ArrayList<>();
+        /** 白名单条目（mod id，支持 * 通配符 + 可选版本约束）。 */
+        private List<PolicyEntry> whitelist = new ArrayList<>();
 
-        /** 黑名单（mod id 列表）。 */
-        private List<String> blacklist = new ArrayList<>();
+        /** 黑名单条目（mod id，支持 * 通配符 + 可选版本约束）。 */
+        private List<PolicyEntry> blacklist = new ArrayList<>();
 
         public PolicyMode mode() {
             return PolicyMode.byKey(mode);
@@ -304,19 +304,19 @@ public class MacConfig {
             this.recheckIntervalSeconds = Math.max(0, recheckIntervalSeconds);
         }
 
-        public List<String> getWhitelist() {
+        public List<PolicyEntry> getWhitelist() {
             return whitelist;
         }
 
-        public void setWhitelist(List<String> whitelist) {
+        public void setWhitelist(List<PolicyEntry> whitelist) {
             this.whitelist = whitelist == null ? new ArrayList<>() : whitelist;
         }
 
-        public List<String> getBlacklist() {
+        public List<PolicyEntry> getBlacklist() {
             return blacklist;
         }
 
-        public void setBlacklist(List<String> blacklist) {
+        public void setBlacklist(List<PolicyEntry> blacklist) {
             this.blacklist = blacklist == null ? new ArrayList<>() : blacklist;
         }
 
@@ -327,6 +327,14 @@ public class MacConfig {
             }
             if (blacklist == null) {
                 blacklist = new ArrayList<>();
+            }
+            whitelist.removeIf(e -> e == null || e.getId() == null || e.getId().trim().isEmpty());
+            blacklist.removeIf(e -> e == null || e.getId() == null || e.getId().trim().isEmpty());
+            for (PolicyEntry e : whitelist) {
+                e.normalize();
+            }
+            for (PolicyEntry e : blacklist) {
+                e.normalize();
             }
             mode = PolicyMode.byKey(mode).key();
             activeMode = PolicyMode.byKey(activeMode).key();

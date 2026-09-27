@@ -73,7 +73,7 @@ public final class ConfigManager {
     public synchronized void save() {
         try {
             Files.createDirectories(file.getParent());
-            Gson pretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+            Gson pretty = Json.prettyGson();
             Files.write(file, pretty.toJson(current).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             Mac.logger().warn("[MAC] 配置保存失败: {}", e.getMessage());
