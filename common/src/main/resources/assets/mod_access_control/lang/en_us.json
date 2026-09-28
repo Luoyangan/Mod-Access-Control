@@ -1,0 +1,4 @@
+{
+  "_comment": "en_us 是基准语言：key 即英文原文，此目录留空即可（缺失条目回退英文原文）。如需覆盖个别文案，可在此以 {\"英文原文\": \"覆盖文本\"} 形式添加。",
+  "example.placeholder": "Remove this line and add overrides here if needed."
+}

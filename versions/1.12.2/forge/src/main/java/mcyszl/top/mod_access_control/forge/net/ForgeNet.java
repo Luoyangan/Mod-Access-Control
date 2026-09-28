@@ -5,6 +5,7 @@ package mcyszl.top.mod_access_control.forge.net;
 
 import io.netty.buffer.ByteBuf;
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.network.Json;
 import mcyszl.top.mod_access_control.core.network.MacPackets;
 import mcyszl.top.mod_access_control.core.network.MacPackets.ClientMod;
@@ -62,7 +63,7 @@ public final class ForgeNet {
         // S2C：登录阶段请求 / 进入游戏阶段请求
         channel.registerMessage(Stage1ReqHandler.class, Stage1ReqPacket.class, id++, Side.CLIENT);
         channel.registerMessage(Stage2ReqHandler.class, Stage2ReqPacket.class, id++, Side.CLIENT);
-        Mac.logger().info("Forge 网络通道已注册 (channel={})", Mac.MOD_ID);
+        Mac.logger().info(Lang.tr("Forge network channel registered (channel={})"), Mac.MOD_ID);
     }
 
     /** 服务端向单个玩家发送一条服务端请求。 */
@@ -76,10 +77,10 @@ public final class ForgeNet {
             } else if (MacPackets.KIND_STAGE2_REQUEST.equals(kind)) {
                 channel.sendTo(new Stage2ReqPacket(payloadJson), player);
             } else {
-                Mac.logger().warn("未知的服务端消息种类，忽略: {}", kind);
+                Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error("发送消息 {} 到 {} 失败", kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
         }
     }
 
@@ -144,7 +145,7 @@ public final class ForgeNet {
                 }
             }
         } catch (Exception e) {
-            Mac.logger().warn("读取本地 Mod 列表失败: {}", e.toString());
+            Mac.logger().warn(Lang.tr("Failed to read local mod list: {}"), e.toString());
         }
         return map;
     }
@@ -167,7 +168,7 @@ public final class ForgeNet {
                 try {
                     task.run();
                 } catch (Exception e) {
-                    Mac.logger().error("处理服务端请求失败: {}", payload == null ? "" : payload);
+                    Mac.logger().error(Lang.tr("Failed to handle server request: {}"), payload == null ? "" : payload);
                 }
             }
         });
@@ -330,7 +331,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage1(sender.getUniqueID().toString(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error("解析 stage1 应答失败(player={})", sender.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sender.getGameProfile().getName());
             }
             return null;
         }
@@ -350,7 +351,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage2(sender.getUniqueID().toString(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error("解析 stage2 应答失败(player={})", sender.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sender.getGameProfile().getName());
             }
             return null;
         }

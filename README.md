@@ -1,192 +1,45 @@
-﻿# Mod Access Control（模组准入控制）
+# Mod Access Control（模组准入控制）
 
-面向 **Minecraft** 的 **服务端** Mod：通过统一协议、服务端规则配置与
-**两阶段握手校验**，对客户端的 Mod 组合实施安全准入控制。同一份规则与同一套协议，
-在 **Forge / Fabric / NeoForge** 三种加载器上行为一致。
+[English](en_us.md)
 
-- Mod id（三端一致）：`mod_access_control`
-- 协议版本：`1`
-- 加载器标识：`forge` / `fabric` / `neoforge`（握手阶段上报，供严格模式比对）
+一个**服务端** Minecraft 模组，让服主精确控制玩家客户端允许（或禁止）安装哪些 Mod。在 **Forge**、**Fabric** 和 **NeoForge** 三种加载器上行为完全一致，共用同一份配置文件和同一套 `/mac` 命令。
 
-> 提示：**客户端也必须安装本模组** 才能完成握手；未安装的客户端会在加入瞬间被拦截
-> （`requireClientMod` 可关闭该强制，见配置）。
+> **注意：** 客户端也必须安装本模组才能完成握手校验；未安装的客户端会在加入服务器时被拦截（可通过 `requireClientMod` 关闭该强制）。
 
----
+## 特性
 
-## 一、功能总览
+- **两阶段握手** —— 登录阶段仅交换协议/加载器等最小信息，进入世界前复核完整 Mod 列表，之后使用上报的列表按间隔定期复检（无需重复传输）。
+- **必需 Mod 校验** —— 支持存在性（`presence`）、版本范围（`version_range`）、严格匹配（`strict`）三种模式。
+- **策略系统** —— `whitelist`（白名单）/ `blacklist`（黑名单）/ `switch`（双模式，可随时切换生效策略并定期复检）。
+- **游戏内管理规则** —— 通过 `/mac` 命令实时查看、增删、重载、保存白/黑名单与必需 Mod 清单，全部带 Tab 补全；可用 `/mac learn` 根据任意玩家的 Mod 清单一键生成名单。
+- **服务端多语言** —— 踢出界面、管理员通知、命令回显等全部文案由服务端配置决定，支持 `zh_cn`、`zh_tw`、`en_us`、`ja_jp`、`ru_ru`（`/mac lang <语言>`，语言文件为 JSON 目录，便于扩展新语言）。
+- **清晰的玩家反馈** —— 被拦截玩家的断开界面会明确列出缺失的必需 Mod、版本不符详情、命中黑名单或白名单外的 Mod，底部提示区支持自定义文案。
+- **豁免机制** —— 可按玩家名或 UUID 豁免指定玩家，也可一键豁免全部 OP。
+- **试运行模式** —— 只记录和通知违规、不实际踢出，方便上线前验证规则。
+- **Mod 历史与审计** —— 每位玩家的客户端 Mod 清单持久化保存（JSONL），可用 `/mac audit` 审计、`/mac recent` 查看最近违规。
+- **管理员提醒** —— 发生拦截时，在线管理员会收到聊天栏 + ActionBar + 音效三重提醒。
+- **健壮的错误处理** —— 配置损坏时自动备份并重置；全流程异常捕获与日志记录，不会导致服务器崩溃。
 
-| 需求 | 实现 |
-| --- | --- |
-| 两阶段握手 | 登录阶段（最小传输：协议/加载器/必需 Mod）+ 进入游戏阶段（完整 Mod 列表复核） |
-| 必需 Mod 校验 | `presence` 存在性 / `version_range` 版本范围 / `strict` 严格匹配 |
-| 策略系统 | `whitelist` / `blacklist` / `switch`（双模式 + 按间隔定期复检） |
-| 规则管理 | 启动读配置 + 游戏内 `/mac` 命令即时修改 / 查看 / 保存（枚举参数带自动补全） |
-| 玩家反馈 | 纯文本断开原因（缺失 / 版本不符 / 违规 Mod 明细）+ 底部提示区（可用自定义行） |
-| 豁免 | `exemptPlayers` 玩家名 / `uuid:` 列表 + `exemptOps`，豁免者跳过全部校验与握手 |
-| 试运行 | `dryRun`：违规只记录 / 通知，不实际踢出，用于上线前验证规则避免误伤 |
-| Mod 历史 | 玩家客户端 Mod 清单持久记录（JSONL），支持 `/mac audit` 审计、`/mac learn` 一键建名单 |
-| 管理辅助 | 在线管理员收到违规广播（聊天 + ActionBar + 音效），`/mac status`、`/mac recent` |
-| 错误处理 | 解析失败自动备份（`*.invalid.bak`）并重置默认；全流程 try/catch + 日志 |
+## 配置
 
----
+配置文件：`<服务器目录>/config/mod_access_control.json`（首次启动自动生成）
 
-## 二、配置文件
+常用配置项：
 
-路径：`<服务器目录>/config/mod_access_control.json`（三个加载器完全一致）。
+- `enabled` —— 总开关
+- `requireClientMod` —— 是否强制客户端安装本模组（默认 `true`）
+- `strictLoader` —— 是否要求客户端加载器与服务端一致
+- `requiredCheckMode` —— 必需 Mod 校验模式：`presence` / `version_range` / `strict`
+- `policy.mode` —— 策略：`whitelist` / `blacklist` / `switch`
+- `language` —— 服务端文案语言：`zh_cn` / `zh_tw` / `en_us` / `ja_jp` / `ru_ru`
+- `exemptPlayers` / `exemptOps` —— 豁免玩家 / 豁免 OP
+- `dryRun` —— 试运行模式（只记录不踢出）
+- `allowedMacVersions` —— 允许接入的本模组版本列表（空 = 任意版本）
 
-默认值（首次启动自动生成）：
+## 命令
 
-| 字段 | 默认 | 含义 |
-| --- | --- | --- |
-| `configVersion` | `1` | 配置结构版本 |
-| `enabled` | `true` | 总开关 |
-| `enforceIntegratedServer` | `false` | 是否在单人存档 / 局域网（内置服务器）中也强制校验 |
-| `requireClientMod` | `true` | 客户端必须安装本模组；未安装者加入时被拦截 |
-| `strictLoader` | `true` | 客户端加载器标识必须与服务端一致 |
-| `handshakeTimeoutSeconds` | `10` | 每个握手阶段的超时秒数 |
-| `requiredCheckMode` | `"presence"` | 必需 Mod 校验模式：`presence` / `version_range` / `strict` |
-| `requiredMods[]` | `[]` | 必需 Mod 清单（`id` + 可选 `bounds[]` 操作符约束，或旧版 `minVersion`/`maxVersion`/`exactVersion`） |
-| `policy.mode` | `"blacklist"` | 策略：`whitelist` / `blacklist` / `switch` |
-| `policy.activeMode` | `"whitelist"` | `switch` 模式下当前生效的策略 |
-| `policy.recheckIntervalSeconds` | `60` | 定期复检间隔（秒），`0` = 不复检 |
-| `policy.whitelist[]` | `[]` | 白名单（mod id，支持 `*` 通配符；可选版本约束写法同必需 Mod） |
-| `policy.blacklist[]` | `[]` | 黑名单（mod id，支持 `*` 通配符；可选版本约束写法同必需 Mod） |
-| `ignoredModIds[]` | `[]` | 额外忽略的 mod id（不参与任何校验） |
-| `logViolations` | `true` | 违规事件是否写入服务端日志 |
-| `exemptPlayers[]` | `[]` | 豁免玩家：玩家名（忽略大小写）或 `uuid:` 前缀的 UUID |
-| `exemptOps` | `false` | 是否默认豁免服务端 OP（不参与任何校验） |
-| `dryRun` | `false` | 试运行：违规只记录 / 通知，不实际踢出（验证规则用） |
-| `allowedMacVersions[]` | `[]` | 允许接入的本模组（Mod Access Control）版本列表，精确匹配客户端 macVersion；空 = 放行任意版本 |
-| `kickFooterEnabled` | `true` | 踢出消息底部“提示区”是否显示 |
-| `kickFooterLines[]` | `[]` | 底部提示区之后追加的自定义行 |
+`/mac` 命令一览：`status`、`recent`、`check`、`audit`、`learn`、`reload`、`save`、`recheck`、`enabled`、`dryrun`、`mode`、`active`、`exempt`、`allowedmac`、`required`、`whitelist`、`blacklist`、`lang`。
 
-**必需 Mod 约束写法**（`version_range` 模式生效；`strict` 模式下上述规则 + 加载器一致性都须满足）：
+游戏内输入 `/mac help` 可查看分页帮助与完整用法。
 
-```json
-"requiredMods": [
-  { "id": "sodium" },                                                  // 任意版本，仅需存在
-  { "id": "fabric-api", "bounds": [ { "op": ">=", "version": "0.100.0" } ] }, // 下限
-  { "id": "some_mod",   "bounds": [ { "op": "<", "version": "2.0.0" } ] },    // 上限
-  { "id": "map_mod",    "bounds": [ { "op": "=", "version": "1.2.3" } ] }     // 精确版本
-]
-```
-
-操作符支持：`=`（等于）、`!=`（不等于）、`>` / `>=`、`<` / `<=`；多条 `bounds` 之间为
-“且”关系。旧版字段 `minVersion` / `maxVersion` / `exactVersion` 仍受支持并自动按
-`[min,max]` / `exact` 语义参与校验（`required add` 已改用手写操作符 `>=1.0.0`、
-`1.0.0~2.0.0`、`--min 1.0.0` 等语法写入 `bounds`）。
-
-完整示例见 [config-example/mod_access_control.json](config-example/mod_access_control.json)。
-
----
-
-## 三、策略模式
-
-| 模式 | 行为 |
-| --- | --- |
-| `whitelist` | 客户端只能安装白名单内 Mod；白名单之外一律拒绝 |
-| `blacklist` | 客户端可装任意 Mod；检测到黑名单内 Mod 即拒绝 |
-| `switch` | 加入时完整检查；运行时可在黑白名单间切换（`activeMode`），并按 `recheckIntervalSeconds` 对已通过玩家定期复检 |
-
-> 忽略机制：本模组自身、`minecraft`、当前加载器及其基础设施（如 `forge`/`fabricloader`/
-> `fabric-api`/`neoforge` 等）恒不参与白名单 / 黑名单 / 必需校验，避免误伤。
-> 注意：黑白名单校验的是**游戏内容 Mod 的 id**，并非文件层面的完整性防作弊手段。
-
----
-
-## 四、命令 `/mac`（权限等级 2）
-
-| 命令 | 作用 |
-| --- | --- |
-| `/mac` 或 `/mac status` | 查看当前策略、清单数量、豁免 / 试运行状态、在线会话统计 |
-| `/mac help [页码]` | 分页帮助（每页 10 条，共 2 页，页码可 Tab 补全） |
-| `/mac recent` | 最近违规记录（最新在前，最多 20 条展示） |
-| `/mac check <玩家>` | 查看指定玩家会话状态（玩家参数可 Tab 补全） |
-| `/mac audit <玩家>` | 查看指定玩家最近的历史 Mod 记录（最多 10 条，来自 JSONL 持久记录） |
-| `/mac learn <玩家> <whitelist/blacklist/required>` | 用该玩家在线/最近一次 Mod 清单一键写入白名单、黑名单或必需清单（自动跳过本模组与忽略项） |
-| `/mac reload` | 从配置文件重新加载规则 |
-| `/mac save` | 把当前内存配置保存到文件 |
-| `/mac recheck` | 用最新规则对在线玩家立即复检一次 |
-| `/mac enabled <true/false>` | 总开关 |
-| `/mac dryrun <true/false>` | 试运行开关（违规不实际踢出） |
-| `/mac mode <whitelist/blacklist/switch>` | 设置策略模式（Tab 可补全） |
-| `/mac active <whitelist/blacklist>` | 设置 switch 模式下生效的策略（Tab 可补全） |
-| `/mac exempt list\|add <玩家>\|remove <玩家>` | 管理豁免名单（移除项 Tab 可补全） |
-| `/mac allowedmac list\|add <版本>\|remove <版本>` | 管理允许接入的本模组版本（空 = 放行任意；`add *` 清空限制） |
-| `/mac required list` | 列出必需 Mod |
-| `/mac required add <id> [操作符写法]` | 新增必需 Mod（如 `>=1.0.0`、`1.0~2.0`、`--exact 1.2.3`） |
-| `/mac required remove <id>` | 移除必需 Mod（Tab 可补全） |
-| `/mac whitelist list\|add <id> [约束]\|remove <id>` | 管理白名单（add 支持 `*` 通配符与版本约束；移除项 Tab 可补全） |
-| `/mac blacklist list\|add <id> [约束]\|remove <id>` | 管理黑名单（add 支持 `*` 通配符与版本约束；移除项 Tab 可补全） |
-
-> 自动补全：`mode` / `active` / `learn`、`required/whitelist/blacklist remove`、以及
-> `check/audit/learn/exempt add` 的玩家参数均提供在线候选，降低误输。
-
-所有修改会即时写盘并影响下一名玩家 / 下一次复检。
-
----
-
-## 五、两阶段握手流程（三加载器一致）
-
-```
-玩家加入
-  ├─ 统一预检(handleLoginAttempt)：总开关关闭 → 直接放行
-  │    ├─ 命中豁免（exemptPlayers / exemptOps）→ 直接放行，不发任何包、不建会话
-  │    ├─ 未装本模组 且 requireClientMod=true → 立即踢出(NO_CLIENT_MOD)；dryRun 下只记录
-  │    └─ 通过 → 建立会话，发送 stage1_req（仅含：协议版本、必需Mod校验模式、必需Mod id 列表）
-       │
-       ▼  客户端应答 stage1_resp（最小数据：协议、加载器标识/版本、本模组版本、必需Mod的版本映射）
-    服务端登录阶段校验：协议版本 → 加载器兼容(严格) → 必需Mod(presence/version_range/strict)
-       │
-       ├─ 失败 → 记录违规；dryRun 下置 VERIFIED 不踢出，否则踢出并记录（明细展示给玩家）
-       └─ 通过 → 发送 stage2_req
-                    │
-                    ▼  客户端应答 stage2_resp（完整 Mod id+版本 列表）
-                 服务端进入游戏阶段校验：必需Mod复核 + 白名单/黑名单 + 加载器(严格)
-                    │
-                    ├─ 失败 → 同上（dryRun 记录 / 正常踢出）
-                    └─ 通过 → 状态 VERIFIED、写入 Mod 历史记录，允许进入世界；之后按间隔定期复检
-```
-
-- **登录阶段**只交换“必要信息”，避免传输全量列表；
-- **进入游戏阶段**拿到全量列表后才放行进世界，并保留该列表供定期复检（无需再次传输）；
-- 任一步骤超时按 `NO_CLIENT_MOD`（stage1）或 `HANDSHAKE_TIMEOUT`（stage2）处理；
-- 握手全部在主线程驱动 / 处理，网络线程仅做编解码（Fabric 经 `execute`、NeoForge 经
-  `enqueueWork` 切回主线程），对服务器 TPS 影响极小。
-
----
-
-## 六、玩家反馈与管理端提示
-
-- **被拒玩家**：断开原因组件由服务端直接构造纯文本（无翻译键依赖），逐条列出
-  “缺少必需 Mod / 版本不符 / 被禁 Mod / 白名单外 Mod”；下方附加底部提示区（默认提示 +
-  配置的自定义行，`kickFooterEnabled` 可整体关闭）。
-- **豁免者**：不发送任何网络消息、不建立会话、不参与校验，直接放行。
-- **试运行（dryRun）**：所有本应踢出的违规划转为“记录违规 + 通知管理员（标注未实际踢出）”，
-  用于上线前验证规则是否误伤。
-- **Mod 历史**：每个通过/被拒玩家在握手结束时把完整 Mod 清单写入
-  `config/mod_access_control_history.jsonl`（最长保留 2 万条 / 8MB），可用 `/mac audit` 审计，
-  或 `/mac learn` 一键把它写入白名单 / 黑名单 / 必需清单。
-- **管理员**：每次拦截通过聊天 + ActionBar + 铁砧音效广播（`[MAC] 违规拦截: 玩家 -> 原因`），
-  无在线管理员时降级为服务端日志；历史记录可用 `/mac recent` 查看。
-
----
-
-## 七、日志与错误处理
-
-- 日志统一前缀 `[MAC]`，包含握手进度、放行 / 拒绝、配置加载与保存结果；
-- 配置文件损坏时自动备份为 `mod_access_control.json.invalid.bak` 并重建默认；
-- 全部网络与规则执行均包裹 try/catch，单个 mod 读取失败不影响整体判断；
-- 违规记录为内存环形缓冲（上限 200 条），服务器重启清空；
-- 玩家 Mod 历史为持久 JSONL 记录（`mod_access_control_history.jsonl`），重启不丢失，
-  自动裁剪（最多 2 万条 / 8MB），供 `/mac audit` 与 `/mac learn` 使用。
-
-## 八、License / 免责
-
-本项目以 Apache License 2.0 发布（许可证全文见 `LICENSE`，版权署名与随附第三方组件见 `NOTICE`）；
-准入控制校验的是 mod 标识与版本组合，供服务器管理者表达
-**“允许/禁止安装哪些 Mod”** 的规则，不构成对文件级改动的防作弊保证。
-
-## 九、版权
-
-@Copyright 2024-2026 原生之旅 | mcyszl.top Luoyangan
+QQ群：812500721

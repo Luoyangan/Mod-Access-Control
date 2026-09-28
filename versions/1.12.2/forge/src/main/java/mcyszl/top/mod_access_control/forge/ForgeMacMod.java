@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.forge;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.forge.command.MacCommand;
 import mcyszl.top.mod_access_control.forge.net.ForgeNet;
 import net.minecraftforge.common.MinecraftForge;
@@ -39,7 +40,7 @@ public final class ForgeMacMod {
         // 游戏内事件（玩家加入离开 / 刻驱动 / 命令注册）
         MinecraftForge.EVENT_BUS.register(ForgeEvents.class);
 
-        Mac.logger().info("Mod Access Control (Forge 1.12.2) 初始化完成 (loader={}, forge={}, version={})",
+        Mac.logger().info(Lang.tr("Mod Access Control (Forge 1.12.2) initialized (loader={}, forge={}, version={})"),
                 Mac.LOADER_FORGE, Holder.bridge().loaderVersion(), Holder.bridge().modVersion());
     }
 

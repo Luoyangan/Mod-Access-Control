@@ -176,7 +176,7 @@ public class RequiredModRule {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < eff.size(); i++) {
             if (i > 0) {
-                sb.append(" 且 ");
+                sb.append(mcyszl.top.mod_access_control.core.i18n.Lang.tr(" and "));
             }
             sb.append(eff.get(i).op).append(eff.get(i).version);
         }

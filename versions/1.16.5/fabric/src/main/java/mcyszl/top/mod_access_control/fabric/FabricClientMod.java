@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.fabric;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -29,6 +30,6 @@ public final class FabricClientMod implements ClientModInitializer {
         // S2C：收到完整列表请求 -> 回送完整 Mod 列表。
         ClientPlayNetworking.registerGlobalReceiver(FabricNet.STAGE2_REQUEST,
                 (client, handler, buf, responseSender) -> client.execute(FabricNet::respondStage2));
-        Mac.logger().info("MAC Fabric 客户端握手接收器已注册");
+        Mac.logger().info(Lang.tr("Fabric client handshake receivers registered"));
     }
 }

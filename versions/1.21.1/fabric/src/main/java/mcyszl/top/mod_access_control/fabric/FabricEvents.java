@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.fabric;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.fabric.command.MacCommand;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -64,7 +65,7 @@ public final class FabricEvents {
     public static void alertOps(String text) {
         MinecraftServer server = MacFabricBridge.server();
         if (server == null) {
-            Mac.logger().warn("(无服务器上下文) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no server context) admin notice: {}"), text);
             return;
         }
         Component line = Component.literal("[MAC] " + text)
@@ -81,7 +82,7 @@ public final class FabricEvents {
             }
         }
         if (!any) {
-            Mac.logger().warn("(无在线管理员) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no online admins) admin notice: {}"), text);
         }
     }
 }

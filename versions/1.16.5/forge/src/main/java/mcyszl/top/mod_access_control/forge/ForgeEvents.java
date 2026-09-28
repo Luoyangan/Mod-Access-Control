@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.forge;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.forge.command.MacCommand;
 import mcyszl.top.mod_access_control.forge.net.ForgeNet;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -73,7 +74,7 @@ public final class ForgeEvents {
     public static void alertOps(String text) {
         MinecraftServer server = MacForgeBridge.server();
         if (server == null) {
-            Mac.logger().warn("(无服务器上下文) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no server context) admin notice: {}"), text);
             return;
         }
         IFormattableTextComponent line = new StringTextComponent("[MAC] " + text)
@@ -90,7 +91,7 @@ public final class ForgeEvents {
             }
         }
         if (!any) {
-            Mac.logger().warn("(无在线管理员) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no online admins) admin notice: {}"), text);
         }
     }
 }

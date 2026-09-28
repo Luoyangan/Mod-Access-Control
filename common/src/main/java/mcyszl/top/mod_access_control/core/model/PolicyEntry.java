@@ -70,7 +70,7 @@ public class PolicyEntry {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < bounds.size(); i++) {
             if (i > 0) {
-                sb.append(" 且 ");
+                sb.append(mcyszl.top.mod_access_control.core.i18n.Lang.tr(" and "));
             }
             RequiredModRule.Bound b = bounds.get(i);
             sb.append(b.getOp()).append(b.getVersion());

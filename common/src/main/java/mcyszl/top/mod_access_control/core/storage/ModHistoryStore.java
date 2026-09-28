@@ -5,6 +5,7 @@ package mcyszl.top.mod_access_control.core.storage;
 
 import com.google.gson.JsonSyntaxException;
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.network.Json;
 
 import java.io.IOException;
@@ -50,7 +51,7 @@ public final class ModHistoryStore {
                 trimIfNeeded();
             }
         } catch (IOException e) {
-            Mac.logger().warn("[MAC] 客户端Mod记录写入失败: {}", e.getMessage());
+            Mac.logger().warn(Lang.tr("Failed to write client mod history: {}"), e.getMessage());
         }
     }
 
@@ -119,7 +120,7 @@ public final class ModHistoryStore {
                 }
             }
         } catch (IOException e) {
-            Mac.logger().warn("[MAC] 客户端Mod记录读取失败: {}", e.getMessage());
+            Mac.logger().warn(Lang.tr("Failed to read client mod history: {}"), e.getMessage());
         }
         return out;
     }

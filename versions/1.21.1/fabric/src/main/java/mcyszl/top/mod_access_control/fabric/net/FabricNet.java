@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.fabric.net;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.network.Json;
 import mcyszl.top.mod_access_control.core.network.MacPackets;
 import mcyszl.top.mod_access_control.core.network.MacPackets.ClientMod;
@@ -54,7 +55,7 @@ public final class FabricNet {
         // 服务端接收 C2S 应答（网络线程），转发到主线程处理。
         ServerPlayNetworking.registerGlobalReceiver(Stage1ResponsePayload.TYPE, FabricNet::onStage1Response);
         ServerPlayNetworking.registerGlobalReceiver(Stage2ResponsePayload.TYPE, FabricNet::onStage2Response);
-        Mac.logger().info("MAC Fabric 网络通道已注册");
+        Mac.logger().info(Lang.tr("Fabric network channel registered"));
     }
 
     /** 服务端向单个玩家发送一条服务端请求（只应在确认对方带本模组后调用）。 */
@@ -65,7 +66,7 @@ public final class FabricNet {
         try {
             if (MacPackets.KIND_STAGE1_REQUEST.equals(kind)) {
                 if (!ServerPlayNetworking.canSend(player, Stage1RequestPayload.TYPE)) {
-                    Mac.logger().warn("客户端 {} 未注册本模组通道，无法发送 stage1 请求",
+                    Mac.logger().warn(Lang.tr("Client {} has not registered this mod's channel; cannot send the stage1 request"),
                             player.getGameProfile().getName());
                     return;
                 }
@@ -76,10 +77,10 @@ public final class FabricNet {
                 }
                 ServerPlayNetworking.send(player, new Stage2RequestPayload(payloadJson));
             } else {
-                Mac.logger().warn("未知的服务端消息种类，忽略: {}", kind);
+                Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error("发送消息 {} 到 {} 失败", kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
         }
     }
 
@@ -97,7 +98,7 @@ public final class FabricNet {
                     Holder.service().receiveStage1(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error("解析 stage1 应答失败(player={})", sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().getName());
             }
         });
     }
@@ -114,7 +115,7 @@ public final class FabricNet {
                     Holder.service().receiveStage2(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error("解析 stage2 应答失败(player={})", sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().getName());
             }
         });
     }
@@ -138,7 +139,7 @@ public final class FabricNet {
             }
             out.accept(new Stage1ResponsePayload(Json.toJson(resp)));
         } catch (Exception e) {
-            Mac.logger().error("构建 stage1 应答失败", e);
+            Mac.logger().error(Lang.tr("Failed to build stage1 response"), e);
         }
     }
 
@@ -152,7 +153,7 @@ public final class FabricNet {
             }
             out.accept(new Stage2ResponsePayload(Json.toJson(resp)));
         } catch (Exception ex) {
-            Mac.logger().error("构建 stage2 应答失败", ex);
+            Mac.logger().error(Lang.tr("Failed to build stage2 response"), ex);
         }
     }
 
@@ -170,7 +171,7 @@ public final class FabricNet {
                 }
             });
         } catch (Exception e) {
-            Mac.logger().warn("读取本地 mod 列表失败: {}", e.toString());
+            Mac.logger().warn(Lang.tr("Failed to read local mod list: {}"), e.toString());
         }
         return map;
     }

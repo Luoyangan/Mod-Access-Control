@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.fabric;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.api.ModInitializer;
 
@@ -21,7 +22,7 @@ public final class FabricMacMod implements ModInitializer {
         Holder.init();
         FabricNet.init();
         FabricEvents.init();
-        Mac.logger().info("Mod Access Control (Fabric) 初始化完成 (loader={}, version={})",
+        Mac.logger().info(Lang.tr("Mod Access Control (Fabric) initialized (loader={}, version={})"),
                 Mac.LOADER_FABRIC, Holder.bridge().modVersion());
     }
 }

@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 import mcyszl.top.mod_access_control.core.network.Json;
@@ -35,7 +36,7 @@ public final class ConfigManager {
         if (!Files.exists(file)) {
             this.current = MacConfig.defaults();
             save();
-            Mac.logger().info("[MAC] 配置文件不存在，已生成默认配置: {}", file);
+            Mac.logger().info(Lang.tr("Config file not found, generated default config: {}"), file);
             return;
         }
         try {
@@ -46,9 +47,11 @@ public final class ConfigManager {
             }
             parsed.normalize();
             this.current = parsed;
-            Mac.logger().info("[MAC] 配置文件加载成功: {}", file);
+            Lang.setLanguage(parsed.getLanguage());
+            Mac.logger().info(Lang.tr("Config file loaded: {}"), file);
         } catch (Exception e) {
-            Mac.logger().warn("[MAC] 配置文件解析失败({}), 已备份并重置为默认配置: {}", e.getMessage(), file);
+            Mac.logger().warn(Lang.tr("Config parse failed ({}), backed up and reset to defaults: {}"),
+                    e.getMessage(), file);
             try {
                 Files.copy(file, file.resolveSibling(file.getFileName() + ".invalid.bak"),
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -66,6 +69,7 @@ public final class ConfigManager {
             current = MacConfig.defaults();
         }
         change.accept(current);
+        Lang.setLanguage(current.getLanguage());
         save();
     }
 
@@ -76,13 +80,14 @@ public final class ConfigManager {
             Gson pretty = Json.prettyGson();
             Files.write(file, pretty.toJson(current).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
-            Mac.logger().warn("[MAC] 配置保存失败: {}", e.getMessage());
+            Mac.logger().warn(Lang.tr("Config save failed: {}"), e.getMessage());
         }
     }
 
     public MacConfig current() {
         if (current == null) {
             current = MacConfig.defaults();
+            Lang.setLanguage(current.getLanguage());
         }
         return current;
     }

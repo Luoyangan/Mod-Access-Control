@@ -8,6 +8,7 @@ import mcyszl.top.mod_access_control.core.config.ConfigManager;
 import mcyszl.top.mod_access_control.core.feedback.DisconnectReason;
 import mcyszl.top.mod_access_control.core.feedback.FeedbackText;
 import mcyszl.top.mod_access_control.core.feedback.KickMessage;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.model.CheckMode;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 import mcyszl.top.mod_access_control.core.model.PolicyEntry;
@@ -80,14 +81,14 @@ public final class MacService {
         configManager.load();
         sessions.clear();
         violations.clear();
-        Mac.logger().info("[MAC] Mod Access Control 已启动 (loader={}, version={})",
+        Mac.logger().info(Lang.tr("Mod Access Control started (loader={}, version={})"),
                 bridge.loaderType(), bridge.modVersion());
     }
 
     public void onServerStopping() {
         configManager.save();
         sessions.clear();
-        Mac.logger().info("[MAC] Mod Access Control 已停止。");
+        Mac.logger().info(Lang.tr("Mod Access Control stopped."));
     }
 
     public ConfigManager configManager() {
@@ -109,7 +110,7 @@ public final class MacService {
         }
         MacConfig cfg = configManager.current();
         if (!cfg.isRequireClientMod()) {
-            Mac.logger().info("[MAC] 客户端准入未强制开启(requireClientMod=false)，放行玩家 {}", playerName);
+            Mac.logger().info(Lang.tr("Client admission not enforced (requireClientMod=false), allowing {}"), playerName);
             return;
         }
         sessions.remove(uuid); // 防御：历史残留
@@ -132,17 +133,20 @@ public final class MacService {
             return;
         }
         if (isExempt(uuid, playerName, isOp)) {
-            Mac.logger().info("[MAC] 玩家 {} 命中豁免名单，跳过准入校验", playerName);
+            Mac.logger().info(Lang.tr("Player {} is exempt, skipping admission check"), playerName);
             return;
         }
         if (!cfg.isRequireClientMod()) {
-            Mac.logger().info("[MAC] 客户端准入未强制开启(requireClientMod=false)，放行玩家 {}", playerName);
+            Mac.logger().info(Lang.tr("Client admission not enforced (requireClientMod=false), allowing {}"), playerName);
             return;
         }
         if (!hasChannel) {
             if (cfg.isDryRun()) {
-                logViolationOnly(uuid, playerName, "试运行(NO_CLIENT_MOD 未拦截): 客户端未安装本模组");
-                bridge.notifyOps("试运行: " + playerName + " 客户端未安装本模组（本将拦截，未实际踢出）");
+                logViolationOnly(uuid, playerName, Lang.tr(
+                        "Dry-run (NO_CLIENT_MOD not blocked): client does not have this mod installed"));
+                bridge.notifyOps(Lang.tr(
+                        "Dry-run: {} does not have this mod installed (would have been kicked, not kicked)",
+                        playerName));
                 return;
             }
             rejectImmediate(uuid, playerName,
@@ -183,7 +187,7 @@ public final class MacService {
     public void onPlayerLeave(String uuid) {
         Session old = sessions.remove(uuid);
         if (old != null) {
-            Mac.logger().info("[MAC] 玩家 {} 离开，会话结束(phase={})", old.name(), old.phase());
+            Mac.logger().info(Lang.tr("Player {} left, session ended (phase={})"), old.name(), old.phase());
         }
     }
 
@@ -225,7 +229,7 @@ public final class MacService {
     public void receiveStage1(String uuid, Stage1Response resp) {
         Session s = sessions.get(uuid);
         if (s == null || s.phase() != Phase.WAIT_STAGE1) {
-            Mac.logger().warn("[MAC] 忽略异常次序的 stage1 响应: {}", uuid);
+            Mac.logger().warn(Lang.tr("Ignoring out-of-order stage1 response: {}"), uuid);
             return;
         }
         MacConfig cfg = configManager.current();
@@ -247,7 +251,8 @@ public final class MacService {
                 && allowedMac.stream().noneMatch(v -> v.equalsIgnoreCase(s.macVersion()))) {
             deny(s, KickMessage.simple(DisconnectReason.MAC_VERSION_NOT_ALLOWED,
                     String.join(", ", allowedMac),
-                    s.macVersion() == null || s.macVersion().isEmpty() ? "未知" : s.macVersion()));
+                    s.macVersion() == null || s.macVersion().isEmpty()
+                            ? Lang.tr("unknown") : s.macVersion()));
             return;
         }
         boolean strict = cfg.requiredMode() == CheckMode.STRICT || cfg.isStrictLoader();
@@ -261,14 +266,14 @@ public final class MacService {
         s.phase(Phase.WAIT_STAGE2);
         armDeadline(s);
         sendStage2Request(s);
-        Mac.logger().info("[MAC] 玩家 {} 通过登录阶段校验，请求完整 Mod 列表", s.name());
+        Mac.logger().info(Lang.tr("Player {} passed login-phase check, requesting full mod list"), s.name());
     }
 
     /** 收到进入游戏阶段响应（完整 Mod 列表）。 */
     public void receiveStage2(String uuid, Stage2Response resp) {
         Session s = sessions.get(uuid);
         if (s == null || s.phase() != Phase.WAIT_STAGE2) {
-            Mac.logger().warn("[MAC] 忽略异常次序的 stage2 响应: {}", uuid);
+            Mac.logger().warn(Lang.tr("Ignoring out-of-order stage2 response: {}"), uuid);
             return;
         }
         List<ClientMod> mods = resp.mods == null ? Collections.<ClientMod>emptyList() : resp.mods;
@@ -283,7 +288,7 @@ public final class MacService {
         s.deadlineTick(0);
         s.lastRecheckTick(tick);
         recordHistory(s, ModRecord.RESULT_VERIFIED);
-        Mac.logger().info("[MAC] 玩家 {} 通过全部准入校验，允许进入游戏（加载 {} 个客户端 Mod）",
+        Mac.logger().info(Lang.tr("Player {} passed all admission checks, allowed in ({} client mods loaded)"),
                 s.name(), s.fullList().size());
     }
 
@@ -300,7 +305,7 @@ public final class MacService {
                 n++;
             }
         }
-        Mac.logger().info("[MAC] 强制复检完成，共扫描 {} 名在线玩家", n);
+        Mac.logger().info(Lang.tr("Forced recheck complete, scanned {} online players"), n);
     }
 
     /** 按配置间隔定期复检单个会话（使用其上报的完整列表，无需再次传输）。 */
@@ -309,7 +314,7 @@ public final class MacService {
         if (problems.isEmpty()) {
             return;
         }
-        Mac.logger().info("[MAC] 定期复检发现玩家 {} 违规，正在执行踢出", s.name());
+        Mac.logger().info(Lang.tr("Periodic recheck found player {} in violation, kicking"), s.name());
         deny(s, KickMessage.violation(problems));
     }
 
@@ -346,8 +351,9 @@ public final class MacService {
         MacConfig cfg = configManager.current();
         msg = decorate(msg);
         if (cfg.isDryRun()) {
-            logViolationOnly(uuid, playerName, "试运行(未拦截): " + msg.summary());
-            bridge.notifyOps("试运行: " + playerName + " -> " + msg.summary() + "（未实际踢出）");
+            logViolationOnly(uuid, playerName, Lang.tr("Dry-run (not blocked): ") + msg.summary());
+            bridge.notifyOps(Lang.tr("Dry-run: ") + playerName + " -> " + msg.summary()
+                    + Lang.tr(" (not actually kicked)"));
             return;
         }
         violations.addFirst(new ViolationRecord(Instant.now().toEpochMilli(),
@@ -356,9 +362,9 @@ public final class MacService {
             violations.removeLast();
         }
         if (cfg.isLogViolations()) {
-            Mac.logger().info("[MAC] 预拦截玩家 {}: {}", playerName, msg.summary());
+            Mac.logger().info(Lang.tr("Pre-blocked player {}: {}"), playerName, msg.summary());
         }
-        bridge.notifyOps("违规拦截: " + playerName + " -> " + msg.summary());
+        bridge.notifyOps(Lang.tr("Blocked: ") + playerName + " -> " + msg.summary());
         bridge.disconnectPlayer(uuid, msg);
     }
 
@@ -367,23 +373,27 @@ public final class MacService {
         MacConfig c = configManager.current();
         List<String> out = new ArrayList<>();
         out.add("== Mod Access Control ==");
-        out.add("启用: " + c.isEnabled());
-        out.add("强制范围: " + (c.isEnforceIntegratedServer() ? "专用服务器+集成服务器" : "仅专用服务器"));
-        out.add("必需Mod校验模式: " + c.requiredMode().key());
-        out.add("必需Mod数量: " + c.getRequiredMods().size());
-        out.add("策略模式: " + c.getPolicy().mode().key());
+        out.add(Lang.tr("Enabled: ") + c.isEnabled());
+        out.add(Lang.tr("Enforcement scope: ")
+                + (c.isEnforceIntegratedServer()
+                        ? Lang.tr("dedicated + integrated servers")
+                        : Lang.tr("dedicated servers only")));
+        out.add(Lang.tr("Required-mod check mode: ") + c.requiredMode().key());
+        out.add(Lang.tr("Required mods: ") + c.getRequiredMods().size());
+        out.add(Lang.tr("Policy mode: ") + c.getPolicy().mode().key());
         if (c.getPolicy().mode() == PolicyMode.SWITCH) {
-            out.add("当前生效策略: " + c.getPolicy().activeMode().key());
-            out.add("复检间隔(秒): " + c.getPolicy().getRecheckIntervalSeconds());
+            out.add(Lang.tr("Active policy: ") + c.getPolicy().activeMode().key());
+            out.add(Lang.tr("Recheck interval (s): ") + c.getPolicy().getRecheckIntervalSeconds());
         }
-        out.add("白名单数量: " + c.getPolicy().getWhitelist().size());
-        out.add("黑名单数量: " + c.getPolicy().getBlacklist().size());
-        out.add("忽略列表: " + c.getIgnoredModIds());
-        out.add("试运行(不踢): " + c.isDryRun());
-        out.add("豁免: " + c.getExemptPlayers().size() + " 条"
-                + (c.isExemptOps() ? "（默认豁免 OP）" : ""));
-        out.add("允许的本模组版本: "
-                + (c.getAllowedMacVersions().isEmpty() ? "全部" : c.getAllowedMacVersions()));
+        out.add(Lang.tr("Whitelist entries: ") + c.getPolicy().getWhitelist().size());
+        out.add(Lang.tr("Blacklist entries: ") + c.getPolicy().getBlacklist().size());
+        out.add(Lang.tr("Ignored list: ") + c.getIgnoredModIds());
+        out.add(Lang.tr("Dry-run (no kick): ") + c.isDryRun());
+        out.add(Lang.tr("Exemptions: ") + c.getExemptPlayers().size()
+                + Lang.tr("") + (c.isExemptOps() ? Lang.tr(" (OPs exempt by default)") : ""));
+        out.add(Lang.tr("Allowed MAC versions: ")
+                + (c.getAllowedMacVersions().isEmpty()
+                        ? Lang.tr("all") : c.getAllowedMacVersions()));
         int verified = 0;
         int pending = 0;
         for (Session s : sessions.values()) {
@@ -393,7 +403,8 @@ public final class MacService {
                 pending++;
             }
         }
-        out.add("在线会话: 已通过 " + verified + " / 校验中 " + pending);
+        out.add(Lang.tr("Online sessions: verified ")
+                + verified + Lang.tr(" / checking ") + pending);
         return out;
     }
 
@@ -406,10 +417,11 @@ public final class MacService {
     public String sessionStatus(String nameOrUuid) {
         for (Session s : sessions.values()) {
             if (s.uuid().equals(nameOrUuid) || s.name().equalsIgnoreCase(nameOrUuid)) {
-                return "玩家 " + s.name() + " 状态: " + s.phase()
-                        + " | 加载器: " + (s.loaderType() == null ? "?" : s.loaderType())
-                        + " | 客户端Mod数: " + s.fullList().size()
-                        + " | 加入于 tick " + s.joinTick();
+                return Lang.tr("Player ") + s.name() + Lang.tr(" status: ") + s.phase()
+                        + Lang.tr(" | loader: ")
+                        + (s.loaderType() == null ? "?" : s.loaderType())
+                        + Lang.tr(" | client mods: ") + s.fullList().size()
+                        + Lang.tr(" | joined at tick ") + s.joinTick();
             }
         }
         return null;
@@ -436,7 +448,7 @@ public final class MacService {
                     .append(r.name == null ? "?" : r.name)
                     .append(" | ").append(r.loader == null ? "?" : r.loader)
                     .append('/').append(r.loaderVersion == null ? "?" : r.loaderVersion)
-                    .append(" | ").append(mods.size()).append(" 个Mod: ");
+                    .append(" | ").append(mods.size()).append(Lang.tr(" mods: "));
             List<String> parts = new ArrayList<>();
             for (int i = 0; i < mods.size() && i < 12; i++) {
                 ClientMod m = mods.get(i);
@@ -457,7 +469,7 @@ public final class MacService {
      */
     public String learn(String nameOrUuid, boolean toWhitelist) {
         MacConfig cfg = configManager.current();
-        String targetName = toWhitelist ? "白名单" : "黑名单";
+        String targetName = toWhitelist ? Lang.tr("whitelist") : Lang.tr("blacklist");
         List<ClientMod> src;
         String sourceDesc;
         Session live = null;
@@ -470,14 +482,14 @@ public final class MacService {
         }
         if (live != null) {
             src = live.fullList();
-            sourceDesc = "在线完整清单";
+            sourceDesc = Lang.tr("live full mod list");
         } else {
             ModRecord rec = history.latestFor(nameOrUuid);
             if (rec == null) {
-                return "找不到玩家 " + nameOrUuid + " 的在线会话或历史 Mod 记录。";
+                return Lang.tr("No live session or mod history found for player {}.", nameOrUuid);
             }
             src = rec.mods;
-            sourceDesc = "最近一次记录";
+            sourceDesc = Lang.tr("latest history record");
         }
         Set<String> ignore = ignoredIds(cfg);
         List<PolicyEntry> target = toWhitelist
@@ -503,12 +515,11 @@ public final class MacService {
             }
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("已用玩家 ").append(nameOrUuid).append(" 的").append(sourceDesc)
-                .append("更新").append(targetName).append("：新增 ").append(added.size())
-                .append("，已存在 ").append(dup).append("，跳过 ").append(skip);
+        sb.append(Lang.tr("Updated {} with {} of player {}: added {}, existing {}, skipped {}",
+                targetName, sourceDesc, nameOrUuid, added.size(), dup, skip));
         if (!added.isEmpty()) {
             int n = Math.min(added.size(), 8);
-            sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
+            sb.append(Lang.tr("; e.g. ")).append(String.join(", ", added.subList(0, n)));
         }
         return sb.toString();
     }
@@ -531,14 +542,14 @@ public final class MacService {
         }
         if (live != null) {
             src = live.fullList();
-            sourceDesc = "在线完整清单";
+            sourceDesc = Lang.tr("live full mod list");
         } else {
             ModRecord rec = history.latestFor(nameOrUuid);
             if (rec == null) {
-                return "找不到玩家 " + nameOrUuid + " 的在线会话或历史 Mod 记录。";
+                return Lang.tr("No live session or mod history found for player {}.", nameOrUuid);
             }
             src = rec.mods;
-            sourceDesc = "最近一次记录";
+            sourceDesc = Lang.tr("latest history record");
         }
         Set<String> ignore = ignoredIds(cfg);
         List<RequiredModRule> target = cfg.getRequiredMods();
@@ -564,12 +575,11 @@ public final class MacService {
         }
         configManager().save();
         StringBuilder sb = new StringBuilder();
-        sb.append("已用玩家 ").append(nameOrUuid).append(" 的").append(sourceDesc)
-                .append("更新必需清单：新增 ").append(added.size())
-                .append("，已存在 ").append(dup).append("，跳过 ").append(skip);
+        sb.append(Lang.tr("Updated required list using {} of player {}: added {}, existing {}, skipped {}",
+                sourceDesc, nameOrUuid, added.size(), dup, skip));
         if (!added.isEmpty()) {
             int n = Math.min(added.size(), 8);
-            sb.append("；示例: ").append(String.join(", ", added.subList(0, n)));
+            sb.append(Lang.tr("; e.g. ")).append(String.join(", ", added.subList(0, n)));
         }
         return sb.toString();
     }
@@ -583,7 +593,8 @@ public final class MacService {
                 : configManager.current().getPolicy().getBlacklist();
         List<String> out = new ArrayList<>();
         for (PolicyEntry e : list) {
-            out.add("  - " + e.getId() + (e.hasBounds() ? "  约束: " + e.constraintText() : ""));
+            out.add("  - " + e.getId() + (e.hasBounds()
+                    ? Lang.tr("  constraint: ") + e.constraintText() : ""));
         }
         return out;
     }
@@ -595,33 +606,35 @@ public final class MacService {
      */
     public String policyAdd(boolean whitelist, String id, String spec) {
         if (id == null || id.trim().isEmpty()) {
-            return "!Mod id 不能为空。";
+            return "!" + Lang.tr("Mod id cannot be empty.");
         }
         final String key = id.trim();
         PolicyEntry entry = new PolicyEntry(key);
         entry.applySpec(spec);
-        String target = whitelist ? "白名单" : "黑名单";
+        String target = whitelist ? Lang.tr("whitelist") : Lang.tr("blacklist");
         List<PolicyEntry> list = whitelist
                 ? configManager.current().getPolicy().getWhitelist()
                 : configManager.current().getPolicy().getBlacklist();
         boolean replaced = list.removeIf(e -> e.getId().equalsIgnoreCase(key));
         configManager.updateAndSave(c -> (whitelist
                 ? c.getPolicy().getWhitelist() : c.getPolicy().getBlacklist()).add(entry));
-        return (replaced ? "已更新" + target + "条目: " : "已向" + target + "加入: ") + entry;
+        return (replaced
+                ? Lang.tr("Updated {} entry: ", target)
+                : Lang.tr("Added to {}: ", target)) + entry;
     }
 
     /** 从白/黑名单移除条目（忽略大小写）。返回命令回显文本；失败时以 "!" 开头。 */
     public String policyRemove(boolean whitelist, String id) {
-        String target = whitelist ? "白名单" : "黑名单";
+        String target = whitelist ? Lang.tr("whitelist") : Lang.tr("blacklist");
         List<PolicyEntry> list = whitelist
                 ? configManager.current().getPolicy().getWhitelist()
                 : configManager.current().getPolicy().getBlacklist();
         boolean had = list.removeIf(e -> e.getId().equalsIgnoreCase(id));
         if (!had) {
-            return "!" + target + "中不存在: " + id;
+            return "!" + Lang.tr("Not found in {}: ", target) + id;
         }
         configManager.save();
-        return "已从" + target + "移除: " + id;
+        return Lang.tr("Removed from {}: ", target) + id;
     }
 
     // ------------------------------------------------------------------ 内部实现
@@ -639,7 +652,7 @@ public final class MacService {
             violations.removeLast();
         }
         if (configManager.current().isLogViolations()) {
-            Mac.logger().info("[MAC] {}", summary);
+            Mac.logger().info("{}", summary);
         }
     }
 
@@ -721,7 +734,7 @@ public final class MacService {
             // 允许未安装本模组的客户端进入（仅记录），不做任何列表校验。
             s.phase(Phase.VERIFIED);
             s.deadlineTick(0);
-            Mac.logger().warn("[MAC] 玩家 {} 未完成校验但配置允许放行(requireClientMod=false)", s.name());
+            Mac.logger().warn(Lang.tr("Player {} did not finish checks but config allows entry (requireClientMod=false)"), s.name());
             return;
         }
         if (s.phase() == Phase.WAIT_STAGE1) {
@@ -740,9 +753,10 @@ public final class MacService {
             recordViolation(s, msg);
             recordHistory(s, ModRecord.RESULT_REJECTED);
             if (cfg.isLogViolations()) {
-                Mac.logger().info("[MAC][试运行] 本将拒绝玩家 {}: {}", s.name(), msg.summary());
+                Mac.logger().info(Lang.tr("[MAC][Dry-run] Would have denied player {}: {}"), s.name(), msg.summary());
             }
-            bridge.notifyOps("试运行: " + s.name() + " -> " + msg.summary() + "（未实际踢出）");
+            bridge.notifyOps(Lang.tr("Dry-run: ") + s.name() + " -> " + msg.summary()
+                    + Lang.tr(" (not actually kicked)"));
             s.phase(Phase.VERIFIED);
             s.deadlineTick(0);
             s.lastRecheckTick(tick);
@@ -752,9 +766,9 @@ public final class MacService {
         recordViolation(s, msg);
         recordHistory(s, ModRecord.RESULT_REJECTED);
         if (cfg.isLogViolations()) {
-            Mac.logger().info("[MAC] 拒绝玩家 {} 进入: {}", s.name(), msg.summary());
+            Mac.logger().info(Lang.tr("Denied player {}: {}"), s.name(), msg.summary());
         }
-        bridge.notifyOps("违规拦截: " + s.name() + " -> " + msg.summary());
+        bridge.notifyOps(Lang.tr("Blocked: ") + s.name() + " -> " + msg.summary());
         bridge.disconnectPlayer(s.uuid(), msg);
         sessions.remove(s.uuid());
     }

@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.forge.command;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
@@ -34,7 +35,7 @@ import java.util.List;
  * audit &lt;玩家&gt; / learn &lt;玩家&gt; &lt;whitelist|blacklist|required&gt; / reload / save /
  * recheck / enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove / allowedmac list|add|remove /
+ * lang &lt;zh_cn|zh_tw|en_us|ja_jp|ru_ru&gt; / exempt list|add|remove / allowedmac list|add|remove /
  * required list|add|remove / whitelist list|add|remove &lt;id&gt; [约束] /
  * blacklist list|add|remove &lt;id&gt; [约束]。</p>
  */
@@ -42,13 +43,15 @@ public final class MacCommand extends CommandBase {
 
     private static final List<String> ROOT_SUBS = Arrays.asList(
             "help", "status", "recent", "check", "audit", "learn", "reload", "save", "recheck",
-            "enabled", "dryrun", "mode", "active", "exempt", "allowedmac",
+            "enabled", "dryrun", "mode", "active", "exempt", "allowedmac", "lang",
             "required", "whitelist", "blacklist");
     private static final List<String> LIST_SUBS = Arrays.asList("list", "add", "remove");
     private static final List<String> BOOLS = Arrays.asList("true", "false");
     private static final List<String> MODES = Arrays.asList("whitelist", "blacklist", "switch");
     private static final List<String> ACTIVE_MODES = Arrays.asList("whitelist", "blacklist");
     private static final List<String> LEARN_MODES = Arrays.asList("whitelist", "blacklist", "required");
+    private static final List<String> LANGS = Arrays.asList(
+            Lang.ZH_CN, Lang.ZH_TW, Lang.EN_US, Lang.JA_JP, Lang.RU_RU);
 
     @Override
     public String getName() {
@@ -57,7 +60,7 @@ public final class MacCommand extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/mac <help|status|recent|check|audit|learn|reload|save|recheck|enabled|dryrun|mode|active|exempt|allowedmac|required|whitelist|blacklist> ...";
+        return "/mac <help|status|recent|check|audit|learn|reload|save|recheck|enabled|dryrun|mode|active|lang|exempt|allowedmac|required|whitelist|blacklist> ...";
     }
 
     @Override
@@ -72,7 +75,7 @@ public final class MacCommand extends CommandBase {
         } catch (MacCmdException ex) {
             send(sender, ex.getMessage(), TextFormatting.RED);
         } catch (Exception ex) {
-            send(sender, "[MAC] 命令执行失败: " + ex.getMessage(), TextFormatting.RED);
+            send(sender, Lang.tr("[MAC] Command failed: ") + ex.getMessage(), TextFormatting.RED);
         }
     }
 
@@ -91,10 +94,11 @@ public final class MacCommand extends CommandBase {
         if (sub.equals("recent")) {
             List<ViolationRecord> v = service().recentViolations();
             if (v.isEmpty()) {
-                send(sender, "暂无违规记录。", TextFormatting.GREEN);
+                send(sender, Lang.tr("No violations recorded."), TextFormatting.GREEN);
                 return;
             }
-            send(sender, "最近违规记录（最新在前，共 " + v.size() + " 条）：", TextFormatting.GREEN);
+            send(sender, Lang.tr("Recent violations (newest first, ") + v.size() + Lang.tr(" total):"),
+                    TextFormatting.GREEN);
             int shown = 0;
             for (ViolationRecord r : v) {
                 if (shown++ >= 20) {
@@ -105,91 +109,102 @@ public final class MacCommand extends CommandBase {
             return;
         }
         if (sub.equals("check")) {
-            String name = argOrThrow(args, 1, "用法: /mac check <玩家>");
+            String name = argOrThrow(args, 1, Lang.tr("Usage: /mac check <player>"));
             String s = service().sessionStatus(name);
             if (s == null) {
-                throw new MacCmdException("[MAC] 找不到玩家: " + name);
+                throw new MacCmdException(Lang.tr("[MAC] Player not found: ") + name);
             }
             send(sender, s, TextFormatting.GREEN);
             return;
         }
         if (sub.equals("audit")) {
-            String name = argOrThrow(args, 1, "用法: /mac audit <玩家>");
+            String name = argOrThrow(args, 1, Lang.tr("Usage: /mac audit <player>"));
             List<String> lines = service().auditLines(name);
             if (lines.isEmpty()) {
-                send(sender, "没有 " + name + " 的历史 Mod 记录。", TextFormatting.GREEN);
+                send(sender, Lang.tr("No mod history for {}.", name), TextFormatting.GREEN);
                 return;
             }
-            send(sender, name + " 的历史 Mod 记录（最新在前）：", TextFormatting.GREEN);
+            send(sender, name + Lang.tr("'s mod history (newest first):"), TextFormatting.GREEN);
             for (String l : lines) {
                 send(sender, "  - " + l, TextFormatting.GREEN);
             }
             return;
         }
         if (sub.equals("learn")) {
-            String name = argOrThrow(args, 1, "用法: /mac learn <玩家> <whitelist|blacklist|required>");
-            String list = argOrThrow(args, 2, "用法: /mac learn <玩家> <whitelist|blacklist|required>");
+            String name = argOrThrow(args, 1, Lang.tr("Usage: /mac learn <player> <whitelist|blacklist|required>"));
+            String list = argOrThrow(args, 2, Lang.tr("Usage: /mac learn <player> <whitelist|blacklist|required>"));
             if (list.equalsIgnoreCase("required")) {
                 send(sender, service().learnRequired(name), TextFormatting.GREEN);
                 return;
             }
             PolicyMode pm = PolicyMode.byKey(list);
             if (pm == PolicyMode.SWITCH) {
-                throw new MacCmdException("learn 只能用于 whitelist 或 blacklist。");
+                throw new MacCmdException(Lang.tr("learn only accepts whitelist or blacklist."));
             }
             send(sender, service().learn(name, pm == PolicyMode.WHITELIST), TextFormatting.GREEN);
             return;
         }
         if (sub.equals("reload")) {
             service().configManager().load();
-            send(sender, "已从配置文件重新加载。若需用最新规则复检在线玩家，请执行 /mac recheck", TextFormatting.GREEN);
+            send(sender, Lang.tr("Reloaded from config file. Run /mac recheck to re-check online players with the latest rules."),
+                    TextFormatting.GREEN);
             return;
         }
         if (sub.equals("save")) {
             service().configManager().save();
-            send(sender, "已保存当前配置到文件。", TextFormatting.GREEN);
+            send(sender, Lang.tr("Current config saved to file."), TextFormatting.GREEN);
             return;
         }
         if (sub.equals("recheck")) {
             service().forceRecheckAll();
-            send(sender, "已按当前规则对在线玩家执行一次完整复检。", TextFormatting.GREEN);
+            send(sender, Lang.tr("Full re-check of online players completed with current rules."), TextFormatting.GREEN);
             return;
         }
         if (sub.equals("enabled")) {
             boolean value = boolArg(args);
             update(cfg -> cfg.setEnabled(value));
-            send(sender, "总开关已设为: " + value + "（若关闭，客户端将不再被强制校验）", TextFormatting.GREEN);
+            send(sender, Lang.tr("Master switch set to: ") + value
+                    + Lang.tr(" (when off, clients are no longer forced through admission checks)"), TextFormatting.GREEN);
             return;
         }
         if (sub.equals("dryrun")) {
             boolean value = boolArg(args);
             update(cfg -> cfg.setDryRun(value));
-            send(sender, "试运行模式已设为: " + value
-                    + (value ? "（违规只记录，不实际踢出玩家）" : ""), TextFormatting.GREEN);
+            send(sender, Lang.tr("Dry-run mode set to: ") + value
+                    + (value ? Lang.tr(" (violations are only logged, no one is kicked)") : ""), TextFormatting.GREEN);
             return;
         }
         if (sub.equals("mode")) {
-            String value = argOrThrow(args, 1, "用法: /mac mode <whitelist|blacklist|switch>");
+            String value = argOrThrow(args, 1, Lang.tr("Usage: /mac mode <whitelist|blacklist|switch>"));
             PolicyMode pm = PolicyMode.byKey(value);
             update(cfg -> cfg.getPolicy().setMode(pm.key()));
             String note = pm == PolicyMode.SWITCH
-                    ? " 提示：当前生效策略请用 /mac active <whitelist|blacklist> 指定。"
+                    ? Lang.tr(" Tip: set the active policy with /mac active <whitelist|blacklist>.")
                     : "";
-            send(sender, "策略模式已设为: " + pm.key() + note, TextFormatting.GREEN);
+            send(sender, Lang.tr("Policy mode set to: ") + pm.key() + note, TextFormatting.GREEN);
             return;
         }
         if (sub.equals("active")) {
-            String value = argOrThrow(args, 1, "用法: /mac active <whitelist|blacklist>");
+            String value = argOrThrow(args, 1, Lang.tr("Usage: /mac active <whitelist|blacklist>"));
             PolicyMode pm = PolicyMode.byKey(value);
             if (pm == PolicyMode.SWITCH) {
-                throw new MacCmdException("active 只能为 whitelist 或 blacklist。");
+                throw new MacCmdException(Lang.tr("active only accepts whitelist or blacklist."));
             }
             update(cfg -> cfg.getPolicy().setActiveMode(pm.key()));
-            send(sender, "当前生效策略已设为: " + pm.key(), TextFormatting.GREEN);
+            send(sender, Lang.tr("Active policy set to: ") + pm.key(), TextFormatting.GREEN);
+            return;
+        }
+        if (sub.equals("lang")) {
+            if (args.length < 2 || args[1] == null || args[1].isEmpty()) {
+                throw new MacCmdException(Lang.tr("Usage: /mac lang <zh_cn|zh_tw|en_us|ja_jp|ru_ru>"));
+            }
+            String key = Lang.normalize(args[1]);
+            update(cfg -> cfg.setLanguage(key));
+            send(sender, Lang.tr("Server language set to: ") + key, TextFormatting.GREEN);
             return;
         }
         if (sub.equals("exempt")) {
-            listOp(sender, args, "豁免名单", new ListOp() {
+            listOp(sender, args, Lang.tr("exemptions"), new ListOp() {
                 @Override
                 public List<String> list() {
                     return cfg().getExemptPlayers();
@@ -208,7 +223,7 @@ public final class MacCommand extends CommandBase {
             return;
         }
         if (sub.equals("allowedmac")) {
-            listOp(sender, args, "允许版本列表", new ListOp() {
+            listOp(sender, args, Lang.tr("allowed versions"), new ListOp() {
                 @Override
                 public List<String> list() {
                     return cfg().getAllowedMacVersions();
@@ -234,19 +249,21 @@ public final class MacCommand extends CommandBase {
             if (args.length >= 2 && "list".equalsIgnoreCase(args[1])) {
                 MacConfig c = cfg();
                 if (c.getRequiredMods().isEmpty()) {
-                    send(sender, "必需 Mod 清单为空（校验模式: " + c.requiredMode().key() + "）。", TextFormatting.GREEN);
+                    send(sender, Lang.tr("Required mod list is empty (check mode: ") + c.requiredMode().key()
+                            + Lang.tr(")."), TextFormatting.GREEN);
                     return;
                 }
-                send(sender, "必需 Mod（校验模式: " + c.requiredMode().key() + "）：", TextFormatting.GREEN);
+                send(sender, Lang.tr("Required mods (check mode: ") + c.requiredMode().key() + Lang.tr("):"),
+                        TextFormatting.GREEN);
                 for (RequiredModRule r : c.getRequiredMods()) {
-                    send(sender, "  - " + r.getId() + "  约束: " + r.constraintText(), TextFormatting.GREEN);
+                    send(sender, "  - " + r.getId() + Lang.tr("  constraint: ") + r.constraintText(), TextFormatting.GREEN);
                 }
                 return;
             }
             if (args.length >= 3 && "add".equalsIgnoreCase(args[1])) {
                 String id = args[2];
                 if (id.equalsIgnoreCase(Mac.MOD_ID)) {
-                    throw new MacCmdException("不能把本模组加入必需清单。");
+                    throw new MacCmdException(Lang.tr("Cannot add this mod itself to the required list."));
                 }
                 StringBuilder spec = new StringBuilder();
                 for (int i = 3; i < args.length; i++) {
@@ -259,20 +276,20 @@ public final class MacCommand extends CommandBase {
                 rule.applySpec(spec.toString());
                 update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(id)));
                 update(cfg -> cfg.getRequiredMods().add(rule));
-                send(sender, "已添加必需 Mod: " + rule.toString(), TextFormatting.GREEN);
+                send(sender, Lang.tr("Added required mod: ") + rule.toString(), TextFormatting.GREEN);
                 return;
             }
             if (args.length >= 3 && "remove".equalsIgnoreCase(args[1])) {
                 String id = args[2];
                 boolean had = cfg().getRequiredMods().stream().anyMatch(r -> r.getId().equalsIgnoreCase(id));
                 if (!had) {
-                    throw new MacCmdException("清单中不存在: " + id);
+                    throw new MacCmdException(Lang.tr("Not in required list: ") + id);
                 }
                 update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(id)));
-                send(sender, "已移除必需 Mod: " + id, TextFormatting.GREEN);
+                send(sender, Lang.tr("Removed required mod: ") + id, TextFormatting.GREEN);
                 return;
             }
-            throw new MacCmdException("用法: /mac required list | add <id> [版本约束] | remove <id>");
+            throw new MacCmdException(Lang.tr("Usage: /mac {} list | add <id> [constraint] | remove <id>", args[0]));
         }
         if (sub.equals("whitelist")) {
             policyOp(sender, args, true);
@@ -282,33 +299,38 @@ public final class MacCommand extends CommandBase {
             policyOp(sender, args, false);
             return;
         }
-        throw new MacCmdException("未知子命令: " + sub + "。" + getUsage(sender));
+        throw new MacCmdException(Lang.tr("Unknown subcommand: ") + sub + ". " + getUsage(sender));
     }
 
     // ------------------------------------------------------------------ 分页帮助
 
-    private static final List<String> HELP_LINES = Arrays.asList(
-            "/mac 或 /mac status - 查看当前策略与会话状态",
-            "/mac recent - 最近违规记录（最多展示 20 条）",
-            "/mac check <玩家> - 查看玩家会话状态",
-            "/mac audit <玩家> - 查看玩家历史 Mod 记录",
-            "/mac learn <玩家> <whitelist|blacklist|required> - 用玩家 Mod 清单一键建名单",
-            "/mac reload - 从配置文件重新加载规则",
-            "/mac save - 保存当前配置到文件",
-            "/mac recheck - 用最新规则对在线玩家复检",
-            "/mac enabled <true|false> - 总开关",
-            "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
-            "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
-            "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
-            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
-            "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
-            "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
-            "/mac whitelist list|add|remove <id> [约束] - 管理白名单（add 支持 * 通配符与版本约束）",
-            "/mac blacklist list|add|remove <id> [约束] - 管理黑名单（add 支持 * 通配符与版本约束）");
+    private List<String> helpLines() {
+        List<String> lines = new ArrayList<String>();
+        lines.add(Lang.tr("/mac or /mac status - show current policy and session status"));
+        lines.add(Lang.tr("/mac recent - recent violations (up to 20 entries)"));
+        lines.add(Lang.tr("/mac check <player> - view a player's session status"));
+        lines.add(Lang.tr("/mac audit <player> - view a player's mod history"));
+        lines.add(Lang.tr("/mac learn <player> <whitelist|blacklist|required> - build lists from a player's mods"));
+        lines.add(Lang.tr("/mac reload - reload rules from the config file"));
+        lines.add(Lang.tr("/mac save - save current config to file"));
+        lines.add(Lang.tr("/mac recheck - re-check online players with latest rules"));
+        lines.add(Lang.tr("/mac enabled <true|false> - master switch"));
+        lines.add(Lang.tr("/mac dryrun <true|false> - dry-run switch (no kicks)"));
+        lines.add(Lang.tr("/mac mode <whitelist|blacklist|switch> - set policy mode"));
+        lines.add(Lang.tr("/mac active <whitelist|blacklist> - active policy in switch mode"));
+        lines.add(Lang.tr("/mac exempt list|add|remove <player> - manage exemptions"));
+        lines.add(Lang.tr("/mac allowedmac list|add|remove <version> - manage allowed MAC versions"));
+        lines.add(Lang.tr("/mac required list|add|remove - manage required mods (add supports version constraints)"));
+        lines.add(Lang.tr("/mac whitelist list|add|remove <id> [constraint] - manage whitelist (add supports * wildcard and version constraints)"));
+        lines.add(Lang.tr("/mac blacklist list|add|remove <id> [constraint] - manage blacklist (add supports * wildcard and version constraints)"));
+        lines.add(Lang.tr("/mac lang <zh_cn|en_us> - set server message language"));
+        return lines;
+    }
 
     private void sendHelp(ICommandSender sender, String[] args) {
+        List<String> lines = helpLines();
         int perPage = 10;
-        int pages = (HELP_LINES.size() + perPage - 1) / perPage;
+        int pages = (lines.size() + perPage - 1) / perPage;
         int page = 1;
         if (args.length >= 2) {
             try {
@@ -322,12 +344,12 @@ public final class MacCommand extends CommandBase {
         if (page > pages) {
             page = pages;
         }
-        send(sender, "===== /mac 帮助 第 " + page + "/" + pages + " 页 =====", TextFormatting.GREEN);
-        for (int i = (page - 1) * perPage; i < page * perPage && i < HELP_LINES.size(); i++) {
-            send(sender, HELP_LINES.get(i), TextFormatting.GREEN);
+        send(sender, Lang.tr("===== /mac help page ") + page + "/" + pages + Lang.tr(" ====="), TextFormatting.GREEN);
+        for (int i = (page - 1) * perPage; i < page * perPage && i < lines.size(); i++) {
+            send(sender, lines.get(i), TextFormatting.GREEN);
         }
         if (page < pages) {
-            send(sender, "下一页: /mac help " + (page + 1), TextFormatting.GREEN);
+            send(sender, Lang.tr("Next page: /mac help ") + (page + 1), TextFormatting.GREEN);
         }
     }
 
@@ -345,10 +367,11 @@ public final class MacCommand extends CommandBase {
         if (args.length >= 2 && "list".equalsIgnoreCase(args[1])) {
             List<String> ids = op.list();
             if (ids.isEmpty()) {
-                send(sender, name + "为空。", TextFormatting.GREEN);
+                send(sender, name + Lang.tr(" is empty."), TextFormatting.GREEN);
                 return;
             }
-            send(sender, name + "（" + ids.size() + " 项）：", TextFormatting.GREEN);
+            send(sender, name + Lang.tr(" (") + ids.size() + Lang.tr(" entries") + Lang.tr("):"),
+                    TextFormatting.GREEN);
             for (String s : ids) {
                 send(sender, "  - " + s, TextFormatting.GREEN);
             }
@@ -357,37 +380,38 @@ public final class MacCommand extends CommandBase {
         if (args.length >= 3 && "add".equalsIgnoreCase(args[1])) {
             String id = args[2];
             if (op.list().stream().anyMatch(i -> i.equalsIgnoreCase(id))) {
-                send(sender, id + " 已存在于" + name + "。", TextFormatting.GREEN);
+                send(sender, Lang.tr("Already in {}: {}", name, id), TextFormatting.GREEN);
                 return;
             }
             op.add(id);
-            send(sender, "已向" + name + "加入: " + id, TextFormatting.GREEN);
+            send(sender, Lang.tr("Added to {}: ", name) + id, TextFormatting.GREEN);
             return;
         }
         if (args.length >= 3 && "remove".equalsIgnoreCase(args[1])) {
             String id = args[2];
             boolean had = op.list().stream().anyMatch(i -> i.equalsIgnoreCase(id));
             if (!had) {
-                throw new MacCmdException(name + "中不存在: " + id);
+                throw new MacCmdException(Lang.tr("Not found in {}: ", name) + id);
             }
             op.remove(id);
-            send(sender, "已从" + name + "移除: " + id, TextFormatting.GREEN);
+            send(sender, Lang.tr("Removed from {}: ", name) + id, TextFormatting.GREEN);
             return;
         }
-        throw new MacCmdException("用法: /mac " + args[0] + " list | add <id> | remove <id>");
+        throw new MacCmdException(Lang.tr("Usage: /mac {} list | add <id> | remove <id>", args[0]));
     }
 
     // ------------------------------------------------------------------ 白/黑名单（PolicyEntry，支持 * 通配符与版本约束）
 
     private void policyOp(ICommandSender sender, String[] args, boolean whitelist) {
-        String name = whitelist ? "白名单" : "黑名单";
+        String name = whitelist ? Lang.tr("whitelist") : Lang.tr("blacklist");
         if (args.length >= 2 && "list".equalsIgnoreCase(args[1])) {
             List<String> lines = service().policyLines(whitelist);
             if (lines.isEmpty()) {
-                send(sender, name + "为空。", TextFormatting.GREEN);
+                send(sender, name + Lang.tr(" is empty."), TextFormatting.GREEN);
                 return;
             }
-            send(sender, name + "（" + lines.size() + " 项，add 支持 * 通配符与版本约束）：", TextFormatting.GREEN);
+            send(sender, name + Lang.tr(" (") + lines.size()
+                    + Lang.tr(" entries; add supports * wildcard and version constraints):"), TextFormatting.GREEN);
             for (String l : lines) {
                 send(sender, l, TextFormatting.GREEN);
             }
@@ -409,7 +433,7 @@ public final class MacCommand extends CommandBase {
             policyResult(sender, service().policyRemove(whitelist, args[2]));
             return;
         }
-        throw new MacCmdException("用法: /mac " + args[0] + " list | add <id> [约束] | remove <id>");
+        throw new MacCmdException(Lang.tr("Usage: /mac {} list | add <id> [constraint] | remove <id>", args[0]));
     }
 
     /** service 回显统一处理："!" 开头为失败提示（红色），其余为成功回显。 */
@@ -436,14 +460,14 @@ public final class MacCommand extends CommandBase {
     }
 
     private static boolean boolArg(String[] args) {
-        String v = argOrThrow(args, 1, "用法: 需要 <true|false> 参数");
+        String v = argOrThrow(args, 1, Lang.tr("Usage: a <true|false> argument is required"));
         if ("true".equalsIgnoreCase(v)) {
             return true;
         }
         if ("false".equalsIgnoreCase(v)) {
             return false;
         }
-        throw new MacCmdException("参数必须是 true 或 false: " + v);
+        throw new MacCmdException(Lang.tr("Argument must be true or false: ") + v);
     }
 
     private static MacConfig cfg() {
@@ -489,6 +513,9 @@ public final class MacCommand extends CommandBase {
             if (sub.equals("active")) {
                 return getListOfStringsMatchingLastWord(args, ACTIVE_MODES);
             }
+            if (sub.equals("lang")) {
+                return getListOfStringsMatchingLastWord(args, LANGS);
+            }
             if (sub.equals("exempt") || sub.equals("allowedmac")
                     || sub.equals("required") || sub.equals("whitelist") || sub.equals("blacklist")) {
                 return getListOfStringsMatchingLastWord(args, LIST_SUBS);
@@ -513,7 +540,7 @@ public final class MacCommand extends CommandBase {
             if ((sub.equals("whitelist") || sub.equals("blacklist")) && "remove".equalsIgnoreCase(args[1])) {
                 List<PolicyEntry> src = sub.equals("whitelist")
                         ? cfg().getPolicy().getWhitelist() : cfg().getPolicy().getBlacklist();
-                List<String> ids = new ArrayList<>();
+                List<String> ids = new ArrayList<String>();
                 for (PolicyEntry e : src) {
                     ids.add(e.getId());
                 }
@@ -524,7 +551,7 @@ public final class MacCommand extends CommandBase {
     }
 
     private static List<String> requiredIds() {
-        List<String> ids = new ArrayList<>();
+        List<String> ids = new ArrayList<String>();
         for (RequiredModRule r : cfg().getRequiredMods()) {
             ids.add(r.getId());
         }
@@ -532,7 +559,7 @@ public final class MacCommand extends CommandBase {
     }
 
     private static List<String> playerNames(MinecraftServer server, String[] args) {
-        List<String> names = new ArrayList<>();
+        List<String> names = new ArrayList<String>();
         if (server == null) {
             server = FMLCommonHandler.instance().getMinecraftServerInstance();
         }

@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.neoforge;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.neoforge.command.MacCommand;
 import mcyszl.top.mod_access_control.neoforge.net.NeoNet;
 import net.minecraft.ChatFormatting;
@@ -69,7 +70,7 @@ public final class NeoEvents {
     public static void alertOps(String text) {
         MinecraftServer server = MacNeoBridge.server();
         if (server == null) {
-            Mac.logger().warn("(无服务器上下文) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no server context) admin notice: {}"), text);
             return;
         }
         Component line = Component.literal("[MAC] " + text)
@@ -86,7 +87,7 @@ public final class NeoEvents {
             }
         }
         if (!any) {
-            Mac.logger().warn("(无在线管理员) 管理员通知: {}", text);
+            Mac.logger().warn(Lang.tr("(no online admins) admin notice: {}"), text);
         }
     }
 }

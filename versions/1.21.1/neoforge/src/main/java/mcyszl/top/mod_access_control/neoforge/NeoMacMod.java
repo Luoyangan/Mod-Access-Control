@@ -4,6 +4,7 @@
 package mcyszl.top.mod_access_control.neoforge;
 
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
@@ -30,7 +31,7 @@ public final class NeoMacMod {
         NeoForge.EVENT_BUS.addListener(NeoEvents::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(NeoEvents::onRegisterCommands);
 
-        Mac.logger().info("Mod Access Control (NeoForge) 初始化完成 (loader={}, version={})",
+        Mac.logger().info(Lang.tr("Mod Access Control (NeoForge) initialized (loader={}, version={})"),
                 Mac.LOADER_NEOFORGE, Holder.bridge().modVersion());
     }
 }

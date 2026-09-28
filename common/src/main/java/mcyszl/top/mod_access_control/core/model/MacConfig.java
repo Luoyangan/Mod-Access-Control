@@ -3,6 +3,8 @@
 
 package mcyszl.top.mod_access_control.core.model;
 
+import mcyszl.top.mod_access_control.core.i18n.Lang;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,6 +75,12 @@ public class MacConfig {
      * 空列表 = 放行任意版本（默认）。条目为大小写不敏感的版本字符串。
      */
     private List<String> allowedMacVersions = new ArrayList<>();
+
+    /**
+     * 服务端文案语言（所有玩家可见消息 / 命令回显统一使用）：
+     * {@code zh_cn}（简体中文，默认）或 {@code en_us}（English）。
+     */
+    private String language = Lang.ZH_CN;
 
     public int getConfigVersion() {
         return configVersion;
@@ -206,6 +214,14 @@ public class MacConfig {
         this.kickFooterLines = kickFooterLines == null ? new ArrayList<>() : kickFooterLines;
     }
 
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = Lang.normalize(language);
+    }
+
     public List<String> getAllowedMacVersions() {
         return allowedMacVersions;
     }
@@ -234,6 +250,7 @@ public class MacConfig {
         if (allowedMacVersions == null) {
             allowedMacVersions = new ArrayList<>();
         }
+        language = Lang.normalize(language);
         if (policy == null) {
             policy = new PolicyConfig();
         }

@@ -3,6 +3,8 @@
 
 package mcyszl.top.mod_access_control.core.validate;
 
+import mcyszl.top.mod_access_control.core.i18n.Lang;
+
 /**
  * 单个违规问题的结构化描述（供玩家提示 / 管理日志 / 违规记录共用）。
  */
@@ -43,16 +45,22 @@ public final class Problem {
     public String summary() {
         switch (type) {
             case MISSING_REQUIRED:
-                return "缺少必需Mod[" + modId + "] 要求" + expected;
+                return Lang.tr("Missing required mod [") + modId + "] "
+                        + Lang.tr("required ") + expected;
             case VERSION_MISMATCH:
-                return "Mod[" + modId + "]版本不符 要求" + expected + " 实际" + (actual == null ? "无" : actual);
+                return "Mod[" + modId + "]" + Lang.tr(" version mismatch, required ")
+                        + expected + " " + Lang.tr("actual ")
+                        + (actual == null ? Lang.tr("none") : actual);
             case BLACKLISTED:
-                return "命中黑名单Mod[" + modId + "] 版本" + (actual == null ? "?" : actual);
+                return Lang.tr("Blacklisted mod [") + modId + "] "
+                        + Lang.tr("version ") + (actual == null ? "?" : actual);
             case NOT_WHITELISTED:
-                return "安装了白名单外Mod[" + modId + "] 版本" + (actual == null ? "?" : actual);
+                return Lang.tr("Non-whitelisted mod [") + modId + "] "
+                        + Lang.tr("version ") + (actual == null ? "?" : actual);
             case LOADER_MISMATCH:
             default:
-                return "加载器不兼容 期望" + expected + " 实际" + actual;
+                return Lang.tr("Loader mismatch, expected ") + expected
+                        + " " + Lang.tr("actual ") + actual;
         }
     }
 

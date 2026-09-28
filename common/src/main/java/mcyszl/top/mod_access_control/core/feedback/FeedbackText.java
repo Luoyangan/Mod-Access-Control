@@ -3,6 +3,7 @@
 
 package mcyszl.top.mod_access_control.core.feedback;
 
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 
 import java.util.ArrayList;
@@ -31,14 +32,14 @@ public final class FeedbackText {
             case NO_CLIENT_MOD:
             case PROTOCOL_MISMATCH:
             case LOADER_MISMATCH:
-                return "提示：请按服务器要求安装正确的模组版本后重新加入。";
+                return Lang.tr("Hint: install the mod version required by the server and rejoin.");
             case HANDSHAKE_TIMEOUT:
-                return "提示：如多次失败，请尝试更新游戏/模组版本后重连。";
+                return Lang.tr("Hint: if this keeps failing, try updating your game/mod version and reconnect.");
             case POLICY_VIOLATION:
-                return "提示：请移除或补齐上述 Mod 后重新加入；如有疑问请联系服务器管理。";
+                return Lang.tr("Hint: remove or install the mods listed above and rejoin; contact server staff if unsure.");
             case MAC_VERSION_NOT_ALLOWED:
             default:
-                return "提示：请把 Mod Access Control 更新/切换到服务器要求的版本后重新加入。";
+                return Lang.tr("Hint: update/switch Mod Access Control to the version required by the server and rejoin.");
         }
     }
 

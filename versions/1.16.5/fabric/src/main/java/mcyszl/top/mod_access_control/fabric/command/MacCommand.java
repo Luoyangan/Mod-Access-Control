@@ -11,6 +11,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import mcyszl.top.mod_access_control.core.Mac;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.model.MacConfig;
 import mcyszl.top.mod_access_control.core.model.PolicyEntry;
 import mcyszl.top.mod_access_control.core.model.PolicyMode;
@@ -38,10 +39,11 @@ import java.util.stream.Collectors;
  * learn &lt;玩家&gt; &lt;whitelist|blacklist|required&gt; / reload / save / recheck /
  * enabled &lt;true|false&gt; / dryrun &lt;true|false&gt; /
  * mode &lt;whitelist|blacklist|switch&gt; / active &lt;whitelist|blacklist&gt; /
- * exempt list|add|remove / required list|add|remove /
- * whitelist list|add|remove / blacklist list|add|remove / allowedmac list|add|remove。</p>
+ * exempt list|add|remove / allowedmac list|add|remove /
+ * required list|add|remove / whitelist list|add|remove /
+ * blacklist list|add|remove / lang &lt;zh_cn|zh_tw|en_us|ja_jp|ru_ru&gt;。</p>
  *
- * <p>枚举参数（mode/active/learn）与列表移除、玩家名参数均带 Brigadier 自动补全。</p>
+ * <p>枚举参数（mode/active/learn/lang）与列表移除、玩家名参数均带 Brigadier 自动补全。</p>
  */
 public final class MacCommand {
 
@@ -75,6 +77,16 @@ public final class MacCommand {
         b.suggest("whitelist");
         b.suggest("blacklist");
         b.suggest("required");
+        return b.buildFuture();
+    };
+
+    /** lang 子命令候选：全部支持的服务端语言。 */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_LANGUAGE = (ctx, b) -> {
+        b.suggest(Lang.ZH_CN);
+        b.suggest(Lang.ZH_TW);
+        b.suggest(Lang.EN_US);
+        b.suggest(Lang.JA_JP);
+        b.suggest(Lang.RU_RU);
         return b.buildFuture();
     };
 
@@ -151,6 +163,12 @@ public final class MacCommand {
                                                         StringArgumentType.getString(c, "list")))))))
                         // ---- 必需 Mod 管理
                         .then(requiredNode())
+                        // ---- 服务端语言设置
+                        .then(Commands.literal("lang")
+                                .then(Commands.argument("value", StringArgumentType.word())
+                                        .suggests(SUGGEST_LANGUAGE)
+                                        .executes(ctx -> run(ctx, c -> language(c,
+                                                StringArgumentType.getString(c, "value"))))))
                         // ---- 白名单 / 黑名单
                         .then(whitelistNode())
                         .then(blacklistNode())
@@ -257,24 +275,28 @@ public final class MacCommand {
 
     // ------------------------------------------------------------------ 分页帮助
 
-    private static final List<String> HELP_LINES = Arrays.asList(
-            "/mac 或 /mac status - 查看当前策略与会话状态",
-            "/mac recent - 最近违规记录（最多展示 20 条）",
-            "/mac check <玩家> - 查看玩家会话状态",
-            "/mac audit <玩家> - 查看玩家历史 Mod 记录",
-            "/mac learn <玩家> <whitelist|blacklist|required> - 用玩家 Mod 清单一键建名单",
-            "/mac reload - 从配置文件重新加载规则",
-            "/mac save - 保存当前配置到文件",
-            "/mac recheck - 用最新规则对在线玩家复检",
-            "/mac enabled <true|false> - 总开关",
-            "/mac dryrun <true|false> - 试运行开关（违规不踢出）",
-            "/mac mode <whitelist|blacklist|switch> - 设置策略模式",
-            "/mac active <whitelist|blacklist> - 设置 switch 模式生效策略",
-            "/mac exempt list|add|remove <玩家> - 管理豁免名单",
-            "/mac allowedmac list|add|remove <版本> - 管理允许接入的本模组版本",
-            "/mac required list|add|remove - 管理必需 Mod（add 支持版本约束）",
-            "/mac whitelist list|add|remove <id> [约束] - 管理白名单（add 支持 * 通配符与版本约束）",
-            "/mac blacklist list|add|remove <id> [约束] - 管理黑名单（add 支持 * 通配符与版本约束）");
+    /** 分页帮助（按服务端语言）。 */
+    private static List<String> helpLines() {
+        return Arrays.asList(
+                Lang.tr("/mac or /mac status - show current policy and session status"),
+                Lang.tr("/mac recent - recent violations (up to 20 entries)"),
+                Lang.tr("/mac check <player> - view a player's session status"),
+                Lang.tr("/mac audit <player> - view a player's mod history"),
+                Lang.tr("/mac learn <player> <whitelist|blacklist|required> - build lists from a player's mods"),
+                Lang.tr("/mac reload - reload rules from the config file"),
+                Lang.tr("/mac save - save current config to file"),
+                Lang.tr("/mac recheck - re-check online players with latest rules"),
+                Lang.tr("/mac enabled <true|false> - master switch"),
+                Lang.tr("/mac dryrun <true|false> - dry-run switch (no kicks)"),
+                Lang.tr("/mac mode <whitelist|blacklist|switch> - set policy mode"),
+                Lang.tr("/mac active <whitelist|blacklist> - active policy in switch mode"),
+                Lang.tr("/mac exempt list|add|remove <player> - manage exemptions"),
+                Lang.tr("/mac allowedmac list|add|remove <version> - manage allowed MAC versions"),
+                Lang.tr("/mac required list|add|remove - manage required mods (add supports version constraints)"),
+                Lang.tr("/mac whitelist list|add|remove <id> [constraint] - manage whitelist (add supports * wildcard and version constraints)"),
+                Lang.tr("/mac blacklist list|add|remove <id> [constraint] - manage blacklist (add supports * wildcard and version constraints)"),
+                Lang.tr("/mac lang <zh_cn|en_us> - set server message language"));
+    }
 
     private static LiteralArgumentBuilder<CommandSourceStack> helpNode() {
         return Commands.literal("help")
@@ -285,20 +307,22 @@ public final class MacCommand {
     }
 
     private static int help(CommandContext<CommandSourceStack> ctx, int page) {
+        List<String> lines = helpLines();
         int perPage = 10;
-        int pages = (HELP_LINES.size() + perPage - 1) / perPage;
+        int pages = (lines.size() + perPage - 1) / perPage;
         if (page < 1) {
             page = 1;
         }
         if (page > pages) {
             page = pages;
         }
-        send(ctx, "===== /mac 帮助 第 " + page + "/" + pages + " 页 =====");
-        for (int i = (page - 1) * perPage; i < page * perPage && i < HELP_LINES.size(); i++) {
-            send(ctx, HELP_LINES.get(i));
+        send(ctx, Lang.tr("===== /mac help page ") + page + "/" + pages
+                + Lang.tr(" ====="));
+        for (int i = (page - 1) * perPage; i < page * perPage && i < lines.size(); i++) {
+            send(ctx, lines.get(i));
         }
         if (page < pages) {
-            send(ctx, "下一页: /mac help " + (page + 1));
+            send(ctx, Lang.tr("Next page: /mac help ") + (page + 1));
         }
         return 1;
     }
@@ -313,7 +337,8 @@ public final class MacCommand {
         try {
             return op.run(ctx);
         } catch (Exception ex) {
-            ctx.getSource().sendFailure(new TextComponent("[MAC] 命令执行失败: " + ex.getMessage()));
+            ctx.getSource().sendFailure(new TextComponent(
+                    Lang.tr("[MAC] Command failed: ") + ex.getMessage()));
             return 0;
         }
     }
@@ -331,10 +356,11 @@ public final class MacCommand {
     private static int recent(CommandContext<CommandSourceStack> ctx) {
         List<ViolationRecord> v = service().recentViolations();
         if (v.isEmpty()) {
-            send(ctx, "暂无违规记录。");
+            send(ctx, Lang.tr("No violations recorded."));
             return 1;
         }
-        send(ctx, "最近违规记录（最新在前，共 " + v.size() + " 条）：");
+        send(ctx, Lang.tr("Recent violations (newest first, ") + v.size()
+                + Lang.tr(" total):"));
         int shown = 0;
         for (ViolationRecord r : v) {
             if (shown++ >= 20) {
@@ -348,7 +374,8 @@ public final class MacCommand {
     private static int check(CommandContext<CommandSourceStack> ctx, String name) {
         String s = service().sessionStatus(name);
         if (s == null) {
-            ctx.getSource().sendFailure(new TextComponent("[MAC] 找不到玩家: " + name));
+            ctx.getSource().sendFailure(new TextComponent(
+                    Lang.tr("[MAC] Player not found: ") + name));
             return 0;
         }
         send(ctx, s);
@@ -358,10 +385,10 @@ public final class MacCommand {
     private static int audit(CommandContext<CommandSourceStack> ctx, String name) {
         List<String> lines = service().auditLines(name);
         if (lines.isEmpty()) {
-            send(ctx, "没有 " + name + " 的历史 Mod 记录。");
+            send(ctx, Lang.tr("No mod history for {}.", name));
             return 1;
         }
-        send(ctx, name + " 的历史 Mod 记录（最新在前）：");
+        send(ctx, name + Lang.tr("'s mod history (newest first):"));
         for (String l : lines) {
             send(ctx, "  - " + l);
         }
@@ -375,7 +402,7 @@ public final class MacCommand {
         }
         PolicyMode pm = PolicyMode.byKey(list);
         if (pm == PolicyMode.SWITCH) {
-            return fail("learn 只能用于 whitelist 或 blacklist。");
+            return fail(Lang.tr("learn only accepts whitelist or blacklist."));
         }
         send(ctx, service().learn(name, pm == PolicyMode.WHITELIST));
         return 1;
@@ -383,32 +410,33 @@ public final class MacCommand {
 
     private static int reload(CommandContext<CommandSourceStack> ctx) {
         service().configManager().load();
-        send(ctx, "已从配置文件重新加载。若需用最新规则复检在线玩家，请执行 /mac recheck");
+        send(ctx, Lang.tr("Reloaded from config file. Run /mac recheck to re-check online players with the latest rules."));
         return 1;
     }
 
     private static int save(CommandContext<CommandSourceStack> ctx) {
         service().configManager().save();
-        send(ctx, "已保存当前配置到文件。");
+        send(ctx, Lang.tr("Current config saved to file."));
         return 1;
     }
 
     private static int recheck(CommandContext<CommandSourceStack> ctx) {
         service().forceRecheckAll();
-        send(ctx, "已按当前规则对在线玩家执行一次完整复检。");
+        send(ctx, Lang.tr("Full re-check of online players completed with current rules."));
         return 1;
     }
 
     private static int enabled(CommandContext<CommandSourceStack> ctx, boolean value) {
         update(cfg -> cfg.setEnabled(value));
-        send(ctx, "总开关已设为: " + value + "（若关闭，客户端将不再被强制校验）");
+        send(ctx, Lang.tr("Master switch set to: ") + value
+                + Lang.tr(" (when off, clients are no longer forced through admission checks)"));
         return 1;
     }
 
     private static int dryrun(CommandContext<CommandSourceStack> ctx, boolean value) {
         update(cfg -> cfg.setDryRun(value));
-        send(ctx, "试运行模式已设为: " + value
-                + (value ? "（违规只记录，不实际踢出玩家）" : ""));
+        send(ctx, Lang.tr("Dry-run mode set to: ") + value
+                + (value ? Lang.tr(" (violations are only logged, no one is kicked)") : ""));
         return 1;
     }
 
@@ -416,19 +444,27 @@ public final class MacCommand {
         PolicyMode pm = PolicyMode.byKey(value);
         update(cfg -> cfg.getPolicy().setMode(pm.key()));
         String note = pm == PolicyMode.SWITCH
-                ? " 提示：当前生效策略请用 /mac active <whitelist|blacklist> 指定。"
+                ? Lang.tr(" Tip: set the active policy with /mac active <whitelist|blacklist>.")
                 : "";
-        send(ctx, "策略模式已设为: " + pm.key() + note);
+        send(ctx, Lang.tr("Policy mode set to: ") + pm.key() + note);
         return 1;
     }
 
     private static int active(CommandContext<CommandSourceStack> ctx, String value) {
         PolicyMode pm = PolicyMode.byKey(value);
         if (pm == PolicyMode.SWITCH) {
-            return fail("active 只能为 whitelist 或 blacklist。");
+            return fail(Lang.tr("active only accepts whitelist or blacklist."));
         }
         update(cfg -> cfg.getPolicy().setActiveMode(pm.key()));
-        send(ctx, "当前生效策略已设为: " + pm.key());
+        send(ctx, Lang.tr("Active policy set to: ") + pm.key());
+        return 1;
+    }
+
+    /** 设置服务端文案语言（/mac lang）。 */
+    private static int language(CommandContext<CommandSourceStack> ctx, String value) {
+        String key = Lang.normalize(value);
+        update(cfg -> cfg.setLanguage(key));
+        send(ctx, Lang.tr("Server language set to: ") + key);
         return 1;
     }
 
@@ -436,10 +472,12 @@ public final class MacCommand {
         List<String> list = cfg().getExemptPlayers();
         boolean ops = cfg().isExemptOps();
         if (list.isEmpty() && !ops) {
-            send(ctx, "豁免名单为空（且未豁免 OP）。");
+            send(ctx, Lang.tr("Exemption list is empty (OPs are not exempt either)."));
             return 1;
         }
-        send(ctx, "豁免配置（" + list.size() + " 条" + (ops ? "，同时豁免 OP" : "") + "）：");
+        send(ctx, Lang.tr("Exemption config (") + list.size()
+                + Lang.tr(" entries") + (ops ? Lang.tr(", OPs also exempt") : "")
+                + Lang.tr("):"));
         for (String s : list) {
             send(ctx, "  - " + s);
         }
@@ -450,12 +488,12 @@ public final class MacCommand {
         List<String> list = cfg().getExemptPlayers();
         for (String i : list) {
             if (i.equalsIgnoreCase(player)) {
-                send(ctx, player + " 已在豁免名单中。");
+                send(ctx, player + Lang.tr(" is already exempt."));
                 return 1;
             }
         }
         update(c -> c.getExemptPlayers().add(player));
-        send(ctx, "已加入豁免名单: " + player);
+        send(ctx, Lang.tr("Added to exemptions: ") + player);
         return 1;
     }
 
@@ -469,20 +507,20 @@ public final class MacCommand {
             }
         }
         if (!had) {
-            return fail("豁免名单中不存在: " + key);
+            return fail(Lang.tr("Not in exemption list: ") + key);
         }
         update(c -> c.getExemptPlayers().removeIf(i -> i.equalsIgnoreCase(key)));
-        send(ctx, "已移出豁免名单: " + key);
+        send(ctx, Lang.tr("Removed from exemptions: ") + key);
         return 1;
     }
 
     private static int allowedMacList(CommandContext<CommandSourceStack> ctx) {
         List<String> list = cfg().getAllowedMacVersions();
         if (list.isEmpty()) {
-            send(ctx, "允许的本模组版本列表为空（放行任意版本）。");
+            send(ctx, Lang.tr("Allowed MAC version list is empty (any version allowed)."));
             return 1;
         }
-        send(ctx, "允许接入的本模组版本（" + list.size() + " 项）：");
+        send(ctx, Lang.tr("Allowed MAC versions ({}):", list.size()));
         for (String s : list) {
             send(ctx, "  - " + s);
         }
@@ -493,17 +531,17 @@ public final class MacCommand {
         List<String> list = cfg().getAllowedMacVersions();
         for (String v : list) {
             if (v.equalsIgnoreCase(version)) {
-                send(ctx, version + " 已在允许列表中。");
+                send(ctx, version + Lang.tr(" is already in the allow list."));
                 return 1;
             }
         }
         if ("*".equals(version)) {
             update(c -> c.getAllowedMacVersions().clear());
-            send(ctx, "已清空限制，放行任意本模组版本。");
+            send(ctx, Lang.tr("Restrictions cleared; any MAC version is allowed."));
             return 1;
         }
         update(c -> c.getAllowedMacVersions().add(version));
-        send(ctx, "已加入允许版本: " + version);
+        send(ctx, Lang.tr("Added to allowed versions: ") + version);
         return 1;
     }
 
@@ -517,35 +555,37 @@ public final class MacCommand {
             }
         }
         if (!had) {
-            return fail("允许列表中不存在: " + key);
+            return fail(Lang.tr("Not in allow list: ") + key);
         }
         update(c -> c.getAllowedMacVersions().removeIf(v -> v.equalsIgnoreCase(key)));
-        send(ctx, "已移出允许版本: " + key);
+        send(ctx, Lang.tr("Removed from allowed versions: ") + key);
         return 1;
     }
 
     private static int requiredList(CommandContext<CommandSourceStack> ctx) {
         MacConfig cfg = cfg();
         if (cfg.getRequiredMods().isEmpty()) {
-            send(ctx, "必需 Mod 清单为空（校验模式: " + cfg.requiredMode().key() + "）。");
+            send(ctx, Lang.tr("Required mod list is empty (check mode: ")
+                    + cfg.requiredMode().key() + Lang.tr(")."));
             return 1;
         }
-        send(ctx, "必需 Mod（校验模式: " + cfg.requiredMode().key() + "）：");
+        send(ctx, Lang.tr("Required mods (check mode: ")
+                + cfg.requiredMode().key() + Lang.tr("):"));
         for (RequiredModRule r : cfg.getRequiredMods()) {
-            send(ctx, "  - " + r.getId() + "  约束: " + r.constraintText());
+            send(ctx, "  - " + r.getId() + Lang.tr("  constraint: ") + r.constraintText());
         }
         return 1;
     }
 
     private static int requiredAdd(CommandContext<CommandSourceStack> ctx, String id, String spec) {
         if (id.equalsIgnoreCase(Mac.MOD_ID)) {
-            return fail("不能把本模组加入必需清单。");
+            return fail(Lang.tr("Cannot add this mod itself to the required list."));
         }
         RequiredModRule rule = new RequiredModRule(id);
         rule.applySpec(spec);
         update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(id)));
         update(cfg -> cfg.getRequiredMods().add(rule));
-        send(ctx, "已添加必需 Mod: " + rule.toString());
+        send(ctx, Lang.tr("Added required mod: ") + rule.toString());
         return 1;
     }
 
@@ -553,10 +593,10 @@ public final class MacCommand {
         final String key = id;
         boolean had = cfg().getRequiredMods().stream().anyMatch(r -> r.getId().equalsIgnoreCase(key));
         if (!had) {
-            return fail("清单中不存在: " + key);
+            return fail(Lang.tr("Not in required list: ") + key);
         }
         update(cfg -> cfg.getRequiredMods().removeIf(r -> r.getId().equalsIgnoreCase(key)));
-        send(ctx, "已移除必需 Mod: " + key);
+        send(ctx, Lang.tr("Removed required mod: ") + key);
         return 1;
     }
 
@@ -586,12 +626,13 @@ public final class MacCommand {
 
     private static int policyList(CommandContext<CommandSourceStack> ctx, boolean whitelist) {
         List<String> lines = service().policyLines(whitelist);
-        String name = whitelist ? "白名单" : "黑名单";
+        String name = whitelist ? Lang.tr("whitelist") : Lang.tr("blacklist");
         if (lines.isEmpty()) {
-            send(ctx, name + "为空。");
+            send(ctx, name + Lang.tr(" is empty."));
             return 1;
         }
-        send(ctx, name + "（" + lines.size() + " 项，add 支持 * 通配符与版本约束）：");
+        send(ctx, name + Lang.tr(" (") + lines.size()
+                + Lang.tr(" entries; add supports * wildcard and version constraints):"));
         for (String s : lines) {
             send(ctx, s);
         }

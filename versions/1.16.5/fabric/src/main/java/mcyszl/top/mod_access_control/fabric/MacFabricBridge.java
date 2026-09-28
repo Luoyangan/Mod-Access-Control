@@ -5,6 +5,7 @@ package mcyszl.top.mod_access_control.fabric;
 
 import mcyszl.top.mod_access_control.core.Mac;
 import mcyszl.top.mod_access_control.core.feedback.KickMessage;
+import mcyszl.top.mod_access_control.core.i18n.Lang;
 import mcyszl.top.mod_access_control.core.platform.PlatformBridge;
 import mcyszl.top.mod_access_control.fabric.net.FabricNet;
 import net.fabricmc.api.EnvType;
@@ -74,7 +75,7 @@ public final class MacFabricBridge implements PlatformBridge {
         if (p != null) {
             FabricNet.sendToPlayer(p, kind, payloadJson);
         } else {
-            Mac.logger().warn("[网络] sendToClient 找不到在线玩家 uuid={}，消息 {} 未发送", playerUuid, kind);
+            Mac.logger().warn(Lang.tr("[Network] sendToClient: player not found (uuid={}), message {} not sent"), playerUuid, kind);
         }
     }
 
@@ -84,7 +85,7 @@ public final class MacFabricBridge implements PlatformBridge {
         if (p != null) {
             p.connection.disconnect(Feedback.disconnect(message));
         } else {
-            Mac.logger().warn("[网络] disconnectPlayer 找不到在线玩家 uuid={}，无法踢出", playerUuid);
+            Mac.logger().warn(Lang.tr("[Network] disconnectPlayer: player not found (uuid={}), cannot kick"), playerUuid);
         }
     }
 
