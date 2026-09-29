@@ -130,3 +130,5 @@ run-*/
 
 docs/*
 READMEA.md
+
+*.eclipse
