@@ -46,6 +46,10 @@ neoForge {
 }
 
 repositories {
+    maven {
+        url = new File(rootDir, '../../../local-maven').canonicalFile.toURI()
+        metadataSources { gradleMetadata(); mavenPom() }
+    }
     mavenCentral()
 }
 
@@ -86,4 +90,26 @@ jar {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+// maven.neoforged.net is unreachable from this network, so MDG-added repos are
+// redirected to the BMCLAPI mirror (path-compatible with /releases).
+afterEvaluate {
+    repositories.each { repo ->
+        try {
+            def u = repo.url?.toString() ?: ''
+            if (u.contains('maven.neoforged.net')) {
+                repo.url = uri('https://mirrors.nyist.edu.cn/bmclapi')
+            }
+        } catch (ignored) {
+        }
+    }
+    // local-maven 必须排在 libraries.minecraft.net 之前：
+    // 后者有 netty-transport-native-kqueue 的 pom 但没有 jar，一旦 Gradle
+    // 在那里锁定模块描述符就不会再回退到 local-maven。
+    def localRepo = repositories.find { it.url?.toString()?.contains('local-maven') }
+    if (localRepo != null && repositories.indexOf(localRepo) != 0) {
+        repositories.remove(localRepo)
+        repositories.add(0, localRepo)
+    }
 }

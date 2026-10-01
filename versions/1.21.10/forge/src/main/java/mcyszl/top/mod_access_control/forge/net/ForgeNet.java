@@ -98,7 +98,7 @@ public final class ForgeNet {
                 Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().name());
         }
     }
 
@@ -232,7 +232,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage1(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().name());
             }
         }
     }
@@ -297,7 +297,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage2(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().name());
             }
         }
     }

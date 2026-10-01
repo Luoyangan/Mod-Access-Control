@@ -64,7 +64,7 @@ public final class MacCommand {
 
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_PLAYERS = (ctx, b) -> {
         ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                b.suggest(p.getGameProfile().getName()));
+                b.suggest(p.nameAndId().name()));
         return b.buildFuture();
     };
 
@@ -104,7 +104,7 @@ public final class MacCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("mac")
-                        .requires(src -> src.hasPermission(2))
+                        .requires(src -> src.permissions().hasPermission(new net.minecraft.server.permissions.Permission.HasCommandLevel(net.minecraft.server.permissions.PermissionLevel.GAMEMASTERS)))
                         .executes(ctx -> run(ctx, MacCommand::status))
                         // ---- 只读
                         .then(Commands.literal("status").executes(ctx -> run(ctx, MacCommand::status)))

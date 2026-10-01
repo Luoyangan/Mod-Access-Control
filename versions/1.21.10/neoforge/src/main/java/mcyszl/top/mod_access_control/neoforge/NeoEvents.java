@@ -45,9 +45,10 @@ public final class NeoEvents {
             return;
         }
         String uuid = sp.getStringUUID();
-        String name = sp.getGameProfile().getName();
+        String name = sp.nameAndId().name();
         boolean hasChannel = NeoNet.remoteHasChannel(sp);
-        boolean isOp = sp.server != null && sp.server.getPlayerList().isOp(sp.getGameProfile());
+        MinecraftServer server = sp.level().getServer();
+        boolean isOp = server != null && server.getPlayerList().isOp(sp.nameAndId());
         Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
     }
 
@@ -75,7 +76,7 @@ public final class NeoEvents {
                 .withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
         boolean any = false;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            if (server.getPlayerList().isOp(p.getGameProfile())) {
+            if (server.getPlayerList().isOp(p.nameAndId())) {
                 p.sendSystemMessage(line);
                 p.displayClientMessage(bar, true);
                 p.playNotifySound(SoundEvents.ANVIL_LAND, SoundSource.MASTER, 0.5f, 1.0f);

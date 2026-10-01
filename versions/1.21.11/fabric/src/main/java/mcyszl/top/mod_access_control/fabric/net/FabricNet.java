@@ -20,7 +20,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -67,7 +67,7 @@ public final class FabricNet {
             if (MacPackets.KIND_STAGE1_REQUEST.equals(kind)) {
                 if (!ServerPlayNetworking.canSend(player, Stage1RequestPayload.TYPE)) {
                     Mac.logger().warn(Lang.tr("Client {} has not registered this mod's channel; cannot send the stage1 request"),
-                            player.getGameProfile().getName());
+                            player.getGameProfile().name());
                     return;
                 }
                 ServerPlayNetworking.send(player, new Stage1RequestPayload(payloadJson));
@@ -80,7 +80,7 @@ public final class FabricNet {
                 Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().name());
         }
     }
 
@@ -98,7 +98,7 @@ public final class FabricNet {
                     Holder.service().receiveStage1(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().name());
             }
         });
     }
@@ -115,7 +115,7 @@ public final class FabricNet {
                     Holder.service().receiveStage2(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().name());
             }
         });
     }
@@ -190,8 +190,8 @@ public final class FabricNet {
     // 消息载体（每个 = 一个协议消息种类；负载为 JSON 字符串）
     // ==================================================================
 
-    private static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, path);
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(Mac.MOD_ID, path);
     }
 
     private static FriendlyByteBuf fb(ByteBuf buf) {

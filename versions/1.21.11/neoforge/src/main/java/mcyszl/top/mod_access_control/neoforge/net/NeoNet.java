@@ -15,12 +15,13 @@ import mcyszl.top.mod_access_control.neoforge.Holder;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.extensions.ICommonPacketListener;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -43,7 +44,7 @@ import java.util.Map;
  * 加/解码与线程切换（全部经 {@code context.enqueueWork} 切回主线程执行），
  * 客户端自动应答逻辑也集中于此。</p>
  */
-@EventBusSubscriber(modid = Mac.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Mac.MOD_ID)
 public final class NeoNet {
 
     private NeoNet() {
@@ -85,7 +86,7 @@ public final class NeoNet {
                 Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.nameAndId().name());
         }
     }
 
@@ -99,8 +100,8 @@ public final class NeoNet {
                 return false;
             }
             // 兼容通道 id 两种可能形态（registrar 通道 id 或 payload 类型 id）
-            return listener.hasChannel(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, Mac.CHANNEL_PATH))
-                    || listener.hasChannel(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, "stage1_req"));
+            return listener.hasChannel(Identifier.fromNamespaceAndPath(Mac.MOD_ID, Mac.CHANNEL_PATH))
+                    || listener.hasChannel(Identifier.fromNamespaceAndPath(Mac.MOD_ID, "stage1_req"));
         } catch (Throwable t) {
             return false;
         }
@@ -123,7 +124,7 @@ public final class NeoNet {
                 for (String rid : ids) {
                     resp.modVersions.put(rid, local.get(rid)); // 未安装 => null => 视为缺失
                 }
-                PacketDistributor.sendToServer(new Stage1ResponseC2S(Json.toJson(resp)));
+                ClientPacketDistributor.sendToServer(new Stage1ResponseC2S(Json.toJson(resp)));
             } catch (Exception e) {
                 Mac.logger().error(Lang.tr("Failed to handle login-phase request"), e);
             }
@@ -138,7 +139,7 @@ public final class NeoNet {
                 for (Map.Entry<String, String> e : localVersions().entrySet()) {
                     resp.mods.add(new ClientMod(e.getKey(), e.getValue()));
                 }
-                PacketDistributor.sendToServer(new Stage2ResponseC2S(Json.toJson(resp)));
+                ClientPacketDistributor.sendToServer(new Stage2ResponseC2S(Json.toJson(resp)));
             } catch (Exception e) {
                 Mac.logger().error(Lang.tr("Failed to handle full mod list request"), e);
             }
@@ -213,7 +214,7 @@ public final class NeoNet {
     /** S2C：登录阶段请求。 */
     public record Stage1RequestS2C(String json) implements CustomPacketPayload {
         public static final Type<Stage1RequestS2C> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, "stage1_req"));
+                new Type<>(Identifier.fromNamespaceAndPath(Mac.MOD_ID, "stage1_req"));
         public static final StreamCodec<FriendlyByteBuf, Stage1RequestS2C> STREAM_CODEC = StreamCodec.of(
                 (buf, msg) -> buf.writeUtf(msg.json()),
                 buf -> new Stage1RequestS2C(buf.readUtf()));
@@ -227,7 +228,7 @@ public final class NeoNet {
     /** C2S：登录阶段应答。 */
     public record Stage1ResponseC2S(String json) implements CustomPacketPayload {
         public static final Type<Stage1ResponseC2S> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, "stage1_resp"));
+                new Type<>(Identifier.fromNamespaceAndPath(Mac.MOD_ID, "stage1_resp"));
         public static final StreamCodec<FriendlyByteBuf, Stage1ResponseC2S> STREAM_CODEC = StreamCodec.of(
                 (buf, msg) -> buf.writeUtf(msg.json()),
                 buf -> new Stage1ResponseC2S(buf.readUtf()));
@@ -241,7 +242,7 @@ public final class NeoNet {
     /** S2C：进入游戏阶段请求。 */
     public record Stage2RequestS2C(String json) implements CustomPacketPayload {
         public static final Type<Stage2RequestS2C> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, "stage2_req"));
+                new Type<>(Identifier.fromNamespaceAndPath(Mac.MOD_ID, "stage2_req"));
         public static final StreamCodec<FriendlyByteBuf, Stage2RequestS2C> STREAM_CODEC = StreamCodec.of(
                 (buf, msg) -> buf.writeUtf(msg.json()),
                 buf -> new Stage2RequestS2C(buf.readUtf()));
@@ -255,7 +256,7 @@ public final class NeoNet {
     /** C2S：进入游戏阶段应答（完整 Mod 列表）。 */
     public record Stage2ResponseC2S(String json) implements CustomPacketPayload {
         public static final Type<Stage2ResponseC2S> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, "stage2_resp"));
+                new Type<>(Identifier.fromNamespaceAndPath(Mac.MOD_ID, "stage2_resp"));
         public static final StreamCodec<FriendlyByteBuf, Stage2ResponseC2S> STREAM_CODEC = StreamCodec.of(
                 (buf, msg) -> buf.writeUtf(msg.json()),
                 buf -> new Stage2ResponseC2S(buf.readUtf()));

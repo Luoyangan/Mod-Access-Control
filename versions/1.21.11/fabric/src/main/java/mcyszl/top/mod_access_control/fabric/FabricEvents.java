@@ -44,9 +44,9 @@ public final class FabricEvents {
                 return;
             }
             String uuid = sp.getStringUUID();
-            String name = sp.getGameProfile().getName();
+            String name = sp.getGameProfile().name();
             boolean hasChannel = ServerPlayNetworking.canSend(sp, FabricNet.Stage1RequestPayload.TYPE);
-            boolean isOp = server.getPlayerList().isOp(sp.getGameProfile());
+            boolean isOp = server.getPlayerList().isOp(sp.nameAndId());
             MacFabricBridge.onJoin(sp);
             Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
         });
@@ -74,10 +74,10 @@ public final class FabricEvents {
                 .withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
         boolean any = false;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            if (server.getPlayerList().isOp(p.getGameProfile())) {
+            if (server.getPlayerList().isOp(p.nameAndId())) {
                 p.sendSystemMessage(line);
                 p.displayClientMessage(bar, true);
-                p.playNotifySound(SoundEvents.ANVIL_LAND, SoundSource.MASTER, 0.5f, 1.0f);
+                p.level().playSound(null, p, SoundEvents.ANVIL_LAND, SoundSource.MASTER, 0.5f, 1.0f);
                 any = true;
             }
         }

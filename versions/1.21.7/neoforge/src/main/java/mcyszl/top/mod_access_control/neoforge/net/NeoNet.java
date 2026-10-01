@@ -21,6 +21,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.extensions.ICommonPacketListener;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -43,7 +44,7 @@ import java.util.Map;
  * 加/解码与线程切换（全部经 {@code context.enqueueWork} 切回主线程执行），
  * 客户端自动应答逻辑也集中于此。</p>
  */
-@EventBusSubscriber(modid = Mac.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Mac.MOD_ID)
 public final class NeoNet {
 
     private NeoNet() {
@@ -123,7 +124,7 @@ public final class NeoNet {
                 for (String rid : ids) {
                     resp.modVersions.put(rid, local.get(rid)); // 未安装 => null => 视为缺失
                 }
-                PacketDistributor.sendToServer(new Stage1ResponseC2S(Json.toJson(resp)));
+                ClientPacketDistributor.sendToServer(new Stage1ResponseC2S(Json.toJson(resp)));
             } catch (Exception e) {
                 Mac.logger().error(Lang.tr("Failed to handle login-phase request"), e);
             }
@@ -138,7 +139,7 @@ public final class NeoNet {
                 for (Map.Entry<String, String> e : localVersions().entrySet()) {
                     resp.mods.add(new ClientMod(e.getKey(), e.getValue()));
                 }
-                PacketDistributor.sendToServer(new Stage2ResponseC2S(Json.toJson(resp)));
+                ClientPacketDistributor.sendToServer(new Stage2ResponseC2S(Json.toJson(resp)));
             } catch (Exception e) {
                 Mac.logger().error(Lang.tr("Failed to handle full mod list request"), e);
             }
@@ -266,3 +267,4 @@ public final class NeoNet {
         }
     }
 }
+

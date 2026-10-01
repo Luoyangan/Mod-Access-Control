@@ -67,7 +67,7 @@ public final class FabricNet {
             if (MacPackets.KIND_STAGE1_REQUEST.equals(kind)) {
                 if (!ServerPlayNetworking.canSend(player, Stage1RequestPayload.TYPE)) {
                     Mac.logger().warn(Lang.tr("Client {} has not registered this mod's channel; cannot send the stage1 request"),
-                            player.getGameProfile().getName());
+                            player.getGameProfile().name());
                     return;
                 }
                 ServerPlayNetworking.send(player, new Stage1RequestPayload(payloadJson));
@@ -80,7 +80,7 @@ public final class FabricNet {
                 Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().name());
         }
     }
 
@@ -98,7 +98,7 @@ public final class FabricNet {
                     Holder.service().receiveStage1(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().name());
             }
         });
     }
@@ -115,7 +115,7 @@ public final class FabricNet {
                     Holder.service().receiveStage2(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().name());
             }
         });
     }

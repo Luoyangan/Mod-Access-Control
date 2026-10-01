@@ -132,3 +132,6 @@ docs/*
 READMEA.md
 
 *.eclipse
+
+# 本地补件 Maven 仓库（含第三方 jar，不入库）
+local-maven/

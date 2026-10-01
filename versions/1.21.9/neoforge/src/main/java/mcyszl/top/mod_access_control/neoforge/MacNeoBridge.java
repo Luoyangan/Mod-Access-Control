@@ -55,7 +55,7 @@ public final class MacNeoBridge implements PlatformBridge {
 
     @Override
     public boolean dedicatedServer() {
-        return FMLEnvironment.dist.isDedicatedServer();
+        return FMLEnvironment.getDist().isDedicatedServer();
     }
 
     @Override

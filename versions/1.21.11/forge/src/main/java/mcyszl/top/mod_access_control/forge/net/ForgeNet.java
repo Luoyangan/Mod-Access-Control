@@ -14,7 +14,7 @@ import mcyszl.top.mod_access_control.core.network.MacPackets.Stage2Response;
 import mcyszl.top.mod_access_control.forge.Holder;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.network.CustomPayloadEvent.Context;
 import net.minecraftforge.fml.ModList;
@@ -49,7 +49,7 @@ public final class ForgeNet {
     /** 在 {@code @Mod} 构造阶段调用：注册通道与四个消息。 */
     public static void init() {
         channel = ChannelBuilder
-                .named(ResourceLocation.fromNamespaceAndPath(Mac.MOD_ID, Mac.CHANNEL_PATH))
+                .named(Identifier.fromNamespaceAndPath(Mac.MOD_ID, Mac.CHANNEL_PATH))
                 .networkProtocolVersion(Mac.PROTOCOL_VERSION)
                 .clientAcceptedVersions((status, version) -> true)
                 .serverAcceptedVersions((status, version) -> true)
@@ -98,7 +98,7 @@ public final class ForgeNet {
                 Mac.logger().warn(Lang.tr("Unknown server message kind, ignoring: {}"), kind);
             }
         } catch (Exception e) {
-            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().getName());
+            Mac.logger().error(Lang.tr("Failed to send message {} to {}"), kind, player.getGameProfile().name());
         }
     }
 
@@ -232,7 +232,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage1(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage1 response (player={})"), sp.getGameProfile().name());
             }
         }
     }
@@ -297,7 +297,7 @@ public final class ForgeNet {
                     Holder.service().receiveStage2(sp.getStringUUID(), resp);
                 }
             } catch (Exception e) {
-                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().getName());
+                Mac.logger().error(Lang.tr("Failed to parse stage2 response (player={})"), sp.getGameProfile().name());
             }
         }
     }

@@ -47,7 +47,8 @@ public final class NeoEvents {
         String uuid = sp.getStringUUID();
         String name = sp.getGameProfile().getName();
         boolean hasChannel = NeoNet.remoteHasChannel(sp);
-        boolean isOp = sp.server != null && sp.server.getPlayerList().isOp(sp.getGameProfile());
+        MinecraftServer server = sp.level().getServer();
+        boolean isOp = server != null && server.getPlayerList().isOp(sp.getGameProfile());
         Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
     }
 

@@ -47,7 +47,8 @@ public final class ForgeEvents {
         String uuid = sp.getStringUUID();
         String name = sp.getGameProfile().getName();
         boolean hasChannel = ForgeNet.remoteHasChannel(sp.connection.getConnection());
-        boolean isOp = sp.server != null && sp.server.getPlayerList().isOp(sp.getGameProfile());
+        var srv = sp.getServer();
+        boolean isOp = srv != null && srv.getPlayerList().isOp(sp.getGameProfile());
         Holder.service().handleLoginAttempt(uuid, name, hasChannel, isOp);
     }
 

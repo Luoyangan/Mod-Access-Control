@@ -43,7 +43,7 @@ import java.util.Map;
  * 加/解码与线程切换（全部经 {@code context.enqueueWork} 切回主线程执行），
  * 客户端自动应答逻辑也集中于此。</p>
  */
-@EventBusSubscriber(modid = Mac.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Mac.MOD_ID)
 public final class NeoNet {
 
     private NeoNet() {

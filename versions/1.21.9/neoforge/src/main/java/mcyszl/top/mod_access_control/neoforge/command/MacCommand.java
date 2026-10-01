@@ -64,7 +64,7 @@ public final class MacCommand {
 
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_PLAYERS = (ctx, b) -> {
         ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                b.suggest(p.getGameProfile().getName()));
+                b.suggest(p.nameAndId().name()));
         return b.buildFuture();
     };
 

@@ -23,6 +23,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.permissions.Permissions;
 
 import java.util.Arrays;
 import java.util.List;
@@ -64,7 +65,7 @@ public final class MacCommand {
 
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_PLAYERS = (ctx, b) -> {
         ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                b.suggest(p.getGameProfile().getName()));
+                b.suggest(p.getGameProfile().name()));
         return b.buildFuture();
     };
 
@@ -104,7 +105,7 @@ public final class MacCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("mac")
-                        .requires(src -> src.hasPermission(2))
+                        .requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                         .executes(ctx -> run(ctx, MacCommand::status))
                         // ---- 只读
                         .then(Commands.literal("status").executes(ctx -> run(ctx, MacCommand::status)))

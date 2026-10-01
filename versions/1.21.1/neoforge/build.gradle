@@ -46,6 +46,10 @@ neoForge {
 }
 
 repositories {
+    maven {
+        url = new File(rootDir, '../../../local-maven').canonicalFile.toURI()
+        metadataSources { gradleMetadata(); mavenPom() }
+    }
     mavenCentral()
 }
 
